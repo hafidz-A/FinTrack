@@ -237,13 +237,17 @@
   background: var(--ft-action-soft);
 }
 .ft-mobile-nav button[data-fab="true"] {
-  flex: 0;
+  flex: 0 0 auto;
   margin-top: -28px;
-  width: 56px; height: 56px;
+  width: 54px; height: 54px;
+  min-width: 54px;
+  aspect-ratio: 1;
+  padding: 0;
   border-radius: 50%;
   background: #DFFB6E;
   color: #0F1419;
   box-shadow: 0 8px 20px rgba(15,23,42,.2);
+  display: grid; place-items: center;
 }
 .ft-mobile-nav button[data-fab="true"]:hover { background: #D2F045; }
 

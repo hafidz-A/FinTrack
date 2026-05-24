@@ -157,6 +157,11 @@ function Reports({ state, dispatch, lang, t, chartStyle, onExportExcel, onExport
     return (lang === 'id' ? 'Setiap ' : 'Every ') + iv + ' ' + uLabel;
   };
 
+  // Calendar states
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  const [selectedDayTxs, setSelectedDayTxs] = useState(null);
+
   // Compute scheduled items for current calendar month
   const scheduledForMonth = useMemo(() => {
     if (!getNextOccurrence) return {};
@@ -187,11 +192,6 @@ function Reports({ state, dispatch, lang, t, chartStyle, onExportExcel, onExport
     });
     return map;
   }, [scheduledTx, currentYear, currentMonth, getNextOccurrence]);
-
-  // Calendar states
-  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
-  const [selectedDayTxs, setSelectedDayTxs] = useState(null);
 
   // Compute date range for the active period
   const range = useMemo(() => {
