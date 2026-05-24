@@ -1047,12 +1047,21 @@
 .bd-status-pill[data-tone="warning"] { background: var(--ft-warning-soft); color: var(--ft-warning); }
 .bd-status-pill[data-tone="danger"]  { background: var(--ft-danger-soft); color: var(--ft-danger); }
 
+
 /* ─── Onboarding ──────────────────────────────────────────────────── */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 .ob-shell {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1.05fr 1fr;
-  background: var(--ft-bg);
+  background: linear-gradient(135deg, #0f172a, #1e293b, #1e1b4b, #0f172a);
+  background-size: 400% 400%;
+  animation: gradient-shift 20s ease infinite;
 }
 .ob-shell[data-centered="true"] {
   grid-template-columns: 1fr;
@@ -1123,7 +1132,9 @@
 @media (max-width: 900px) {
   .ob-shell {
     grid-template-columns: 1fr;
-    background: linear-gradient(135deg, #1E3A5F 0%, #2A4A75 60%, #2563EB 130%);
+    background: linear-gradient(135deg, #0f172a, #1e293b, #1e1b4b, #0f172a);
+    background-size: 400% 400%;
+    animation: gradient-shift 20s ease infinite;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1166,12 +1177,35 @@
 }
 
 .ob-left {
-  background: linear-gradient(135deg, #1E3A5F 0%, #2A4A75 60%, #2563EB 130%);
+  background: linear-gradient(135deg, #1e3a8a, #0f172a, #3b82f6, #1e3a8a);
+  background-size: 400% 400%;
+  animation: gradient-shift 18s ease infinite;
   color: white;
   padding: 56px;
   position: relative;
   overflow: hidden;
   display: flex; flex-direction: column;
+}
+
+/* Sidebar collapsed brand adjustments */
+.ft-app[data-sb="icon"] .ft-sb-brand {
+  display: flex;
+  justify-content: center;
+  padding: 0;
+}
+.ft-app[data-sb="icon"] .ft-logo-text {
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  .ft-app:not([data-sb="hidden"]):not([data-sb="full"]) .ft-sb-brand {
+    display: flex;
+    justify-content: center;
+    padding: 0;
+  }
+  .ft-app:not([data-sb="hidden"]):not([data-sb="full"]) .ft-logo-text {
+    display: none !important;
+  }
 }
 .ob-left::before {
   content: ""; position: absolute;
@@ -2092,3 +2126,23 @@
   border-color: rgba(220,38,38,.25);
 }
 .set-danger .set-row-label { color: var(--ft-danger); }
+
+/* Shifting gradient elements (dashboard hero, savings rate, goals, budgets, net positions) */
+.dash-hero,
+.gl-hero,
+.bd-allocated,
+.rp-summary-card[data-tone="primary"],
+.tx-summary-net,
+.acc-net-card {
+  background: linear-gradient(135deg, #1e3a8a, #0f172a, #3b82f6, #1e3a8a) !important;
+  background-size: 400% 400% !important;
+  animation: gradient-shift 18s ease infinite !important;
+}
+
+.tx-summary-net,
+.acc-net-card {
+  color: white !important;
+  border: 0 !important;
+  position: relative !important;
+  overflow: hidden !important;
+}

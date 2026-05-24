@@ -39,6 +39,12 @@ function defaultSettings(profile = {}) {
     notifMarketing: false,
     currency: 'IDR',
     dateFormat: 'DD/MM/YYYY',
+    theme: 'light',
+    lang: 'id',
+    density: 'regular',
+    calendarIncludeCuti: true,
+    calendarPayday: 25,
+    calendarPaydayException: 'before',
   };
 }
 
@@ -57,20 +63,20 @@ function loadSettings(settingsKey, profile) {
   return base;
 }
 
-function Settings({ lang, t, state, supabaseMode = false, profile = {}, settingsKey = 'ft_settings', onProfileChange, setLang, tw, setTw, onLogout, onExportExcel, onImportExcel, onResetPrivateData }) {
+function Settings({ lang, t, state, supabaseMode = false, profile = {}, settingsKey = 'ft_settings', onProfileChange, setLang, tw, setTw, onLogout, onExportExcel, onImportExcel, onResetPrivateData, settings, onSettingsChange }) {
   const [section, setSection] = useState(() => localStorage.getItem('ft_set_sec') || 'profile');
   useEffect(() => { localStorage.setItem('ft_set_sec', section); }, [section]);
   useEffect(() => {
     if (section === 'billing') setSection('profile');
   }, [section]);
 
-  // Settings state (persisted per signed-in user when Supabase is enabled)
-  const [s, setS] = useState(() => loadSettings(settingsKey, profile));
+  // Settings state (synchronized to root App preferences)
+  const [s, setS] = useState(() => settings || loadSettings(settingsKey, profile));
   useEffect(() => {
-    setS(loadSettings(settingsKey, profile));
-  }, [settingsKey]);
+    if (settings) setS(settings);
+  }, [settings]);
   useEffect(() => {
-    localStorage.setItem(settingsKey, JSON.stringify(s));
+    if (onSettingsChange) onSettingsChange(s);
     const nextProfile = {
       name: cleanText(s.name),
       handle: cleanText(s.handle),
@@ -81,7 +87,7 @@ function Settings({ lang, t, state, supabaseMode = false, profile = {}, settings
       joined: profile.joined || s.joined,
     };
     onProfileChange && onProfileChange(nextProfile);
-  }, [s, settingsKey]);
+  }, [s, onSettingsChange]);
 
   const update = (k, v) => {
     setS((prev) => ({ ...prev, [k]: v }));
@@ -364,7 +370,10 @@ function Settings({ lang, t, state, supabaseMode = false, profile = {}, settings
                        { value: 'light', label: t('settings.displayThemeLight') },
                        { value: 'dark',  label: t('settings.displayThemeDark') },
                      ]}
-                     onChange={(v) => setTw('dark', v === 'dark')} />
+                     onChange={(v) => {
+                       setTw('dark', v === 'dark');
+                       update('theme', v);
+                     }} />
               </div>
               <div className="set-row">
                 <div className="set-row-text">
@@ -376,7 +385,10 @@ function Settings({ lang, t, state, supabaseMode = false, profile = {}, settings
                        { value: 'id', label: 'ID' },
                        { value: 'en', label: 'EN' },
                      ]}
-                     onChange={setLang} />
+                     onChange={(v) => {
+                       setLang(v);
+                       update('lang', v);
+                     }} />
               </div>
               <div className="set-row">
                 <div className="set-row-text">
@@ -389,7 +401,10 @@ function Settings({ lang, t, state, supabaseMode = false, profile = {}, settings
                        { value: 'regular', label: lang === 'id' ? 'Normal' : 'Regular' },
                        { value: 'comfy',   label: lang === 'id' ? 'Lega' : 'Comfy' },
                      ]}
-                     onChange={(v) => setTw('density', v)} />
+                     onChange={(v) => {
+                       setTw('density', v);
+                       update('density', v);
+                     }} />
               </div>
               <div className="set-row">
                 <div className="set-row-text">
@@ -651,4 +666,4 @@ function Seg({ value, options, onChange }) {
   );
 }
 
-Object.assign(window, { Settings, Switch, Seg });
+Object.assign(window, { Settings, Switch, Seg, loadSettings, defaultSettings });

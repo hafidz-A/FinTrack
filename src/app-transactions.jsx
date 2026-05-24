@@ -75,9 +75,7 @@ function Transactions({ state, dispatch, lang, t, search, onOpenAdd }) {
           </div>
           <div className="tx-summary-delta">{lang === 'id' ? 'Rata-rata' : 'Avg'} {formatIDR(monthStats.expense / Math.max(new Date().getDate(), 1), { compact: true })}/{lang === 'id' ? 'hari' : 'day'}</div>
         </div>
-        <div className="ft-card tx-summary" style={{
-          background: 'linear-gradient(135deg, #1E3A5F, #2563EB)', color: 'white', border: 0, position: 'relative', overflow: 'hidden',
-        }}>
+        <div className="ft-card tx-summary tx-summary-net">
           <div className="tx-summary-label" style={{ color: 'rgba(255,255,255,.8)' }}>
             <Icon name="trending" size={16} />
             {t('transactions.net')} · {t('common.thisMonth')}
@@ -271,7 +269,13 @@ function Transactions({ state, dispatch, lang, t, search, onOpenAdd }) {
 }
 
 // ── QuickAddTx Modal ────────────────────────────────────────────────────────
-function QuickAddTx({ open, onClose, onSave, initialType = 'expense', lang, t, accounts, categories }) {
+function QuickAddTx({ open, onClose, onSave, initialType = 'expense', lang, t, accounts, categories, dispatch }) {
+  const { AddCustomCategoryModal } = window;
+  const [addCustomCatOpen, setAddCustomCatOpen] = useState(false);
+  const handleSaveCustomCat = (newCat) => {
+    if (dispatch) dispatch({ type: 'ADD_CATEGORY', category: newCat });
+    setCategory(newCat.id);
+  };
   const [type, setType] = useState(initialType);
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('food');
@@ -362,7 +366,14 @@ function QuickAddTx({ open, onClose, onSave, initialType = 'expense', lang, t, a
                 <span className="qa-cat-label">{lang === 'id' ? c.label : c.labelEn}</span>
               </button>
             ))}
+            <button type="button" className="qa-cat"
+                    style={{ border: '1px dashed var(--ft-border)', background: 'transparent' }}
+                    onClick={() => setAddCustomCatOpen(true)}>
+              <span className="qa-cat-emoji">➕</span>
+              <span className="qa-cat-label">{lang === 'id' ? 'Kategori Baru' : 'New Category'}</span>
+            </button>
           </div>
+          <AddCustomCategoryModal open={addCustomCatOpen} onClose={() => setAddCustomCatOpen(false)} onSave={handleSaveCustomCat} lang={lang} t={t} />
         </>
       )}
 

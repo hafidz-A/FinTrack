@@ -186,8 +186,8 @@ function Modal({ open, onClose, title, sub, children, size = "md", footer }) {
 // ── Logo ────────────────────────────────────────────────────────────────────
 function Logo({ size = 32, collapsed = false }) {
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-      <span style={{
+    <div className="ft-logo-wrap" style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+      <span className="ft-logo-mark" style={{
         width: size, height: size,
         background: 'var(--ft-primary)',
         color: 'white',
@@ -204,11 +204,86 @@ function Logo({ size = 32, collapsed = false }) {
         </svg>
       </span>
       {!collapsed && (
-        <span style={{ fontFamily: 'var(--ft-font-display)', fontWeight: 700, fontSize: 20, letterSpacing: '-0.01em' }}>
+        <span className="ft-logo-text" style={{ fontFamily: 'var(--ft-font-display)', fontWeight: 700, fontSize: 20, letterSpacing: '-0.01em' }}>
           FinTrack
         </span>
       )}
     </div>
+  );
+}
+
+// ── AddCustomCategoryModal ──────────────────────────────────────────────────
+function AddCustomCategoryModal({ open, onClose, onSave, lang, t }) {
+  const [name, setName] = useState('');
+  const [emoji, setEmoji] = useState('🏷️');
+  const [color, setColor] = useState('#3B82F6');
+  const [emojiOpen, setEmojiOpen] = useState(false);
+
+  const colors = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6', '#F43F5E', '#64748B'];
+  const emojis = ['🍽️', '☕', '🚕', '🛍️', '🧾', '🏥', '🎬', '📚', '💻', '📊', '💸', '✈️', '🐶', '🏠', '🎁', '💈', '🎨', '👔', '🧗', '🍔', '🍺', '🚗', '🩺', '🏫', '🛒', '⚡', '📶'];
+
+  const submit = () => {
+    if (!name.trim()) return;
+    onSave({
+      id: 'cat_' + Date.now(),
+      label: name,
+      labelEn: name,
+      icon: emoji,
+      color: color,
+    });
+    setName('');
+    setEmoji('🏷️');
+    setColor('#3B82F6');
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose}
+           title={lang === 'id' ? 'Tambah Kategori Kustom' : 'Add Custom Category'}
+           sub={lang === 'id' ? 'Buat kategori transaksi & anggaran baru' : 'Create a new category for cashflow & budgets'}
+           footer={
+             <>
+               <button className="ft-btn" data-variant="ghost" onClick={onClose}>{t('common.cancel')}</button>
+               <button className="ft-btn" data-variant="primary" onClick={submit}>{t('common.save')}</button>
+             </>
+           }>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+          <div style={{ position: 'relative' }}>
+            <button type="button" className="ft-btn" data-variant="ghost" 
+                    style={{ width: 64, height: 64, fontSize: 32, padding: 0, borderRadius: 16, background: color + '22', border: `2px dashed ${color}`, color: color, display: 'grid', placeItems: 'center' }}
+                    onClick={() => setEmojiOpen(!emojiOpen)}>
+              {emoji}
+            </button>
+            {emojiOpen && (
+              <div className="ft-pop" style={{ position: 'absolute', top: 74, left: 0, zIndex: 100, width: 220, padding: 10, background: 'var(--ft-surface)', border: '1px solid var(--ft-border)', borderRadius: 12, boxShadow: 'var(--ft-shadow-lg)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+                  {emojis.map((e) => (
+                    <button key={e} type="button" className="ft-btn" data-variant="ghost" style={{ padding: 0, height: 32, fontSize: 18 }}
+                            onClick={() => { setEmoji(e); setEmojiOpen(false); }}>
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={{ flex: 1 }}>
+            <label className="ft-label">{lang === 'id' ? 'Nama Kategori' : 'Category Name'}</label>
+            <input className="ft-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={lang === 'id' ? 'Kopi, Hobi, Peliharaan...' : 'Coffee, Hobby, Pets...'} />
+          </div>
+        </div>
+        <div>
+          <label className="ft-label">{lang === 'id' ? 'Warna Representasi' : 'Category Color'}</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+            {colors.map((c) => (
+              <button key={c} type="button" onClick={() => setColor(c)}
+                      style={{ width: 32, height: 32, borderRadius: 8, background: c, border: color === c ? '3px solid var(--ft-action)' : '3px solid transparent', cursor: 'pointer', padding: 0 }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -223,5 +298,5 @@ function getGreetingKey() {
 Object.assign(window, {
   useI18n, formatIDR, formatRelativeDate, formatDateLong,
   Icon, ICONS, getCategory, getAccount,
-  ToastBus, ToastHost, Modal, Logo, getGreetingKey,
+  ToastBus, ToastHost, Modal, Logo, AddCustomCategoryModal, getGreetingKey,
 });

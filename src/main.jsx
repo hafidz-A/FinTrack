@@ -97,6 +97,8 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
           return { ...state, budgets: [...state.budgets, action.budget] };
         case 'DEL_BUDGET':
           return { ...state, budgets: state.budgets.filter((b) => b.id !== action.id) };
+        case 'ADD_CATEGORY':
+          return { ...state, categories: [...state.categories, action.category] };
         case 'ADD_GOAL':
           return { ...state, goals: [...state.goals, action.goal] };
         case 'DEL_GOAL':
@@ -221,6 +223,49 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       const [vaultRecoveryCode, setVaultRecoveryCode] = useState('');
       const [profile, setProfile] = useState(() => ({ ...(window.FT_DATA.user || {}) }));
       const profileSettingsKey = supabaseMode && session?.user?.id ? `ft_settings_${session.user.id}` : 'ft_settings';
+
+      // root settings state (synchronised across views)
+      const [settings, setSettings] = useState(() => {
+        if (window.loadSettings) {
+          return window.loadSettings(profileSettingsKey, window.FT_DATA.user || {});
+        }
+        return {};
+      });
+
+      const handleSetTw = (key, value) => {
+        setTw(key, value);
+        if (key === 'dark' || key === 'density') {
+          const sKey = key === 'dark' ? 'theme' : 'density';
+          const sVal = key === 'dark' ? (value ? 'dark' : 'light') : value;
+          setSettings((prev) => {
+            const next = { ...prev, [sKey]: sVal };
+            localStorage.setItem(profileSettingsKey, JSON.stringify(next));
+            return next;
+          });
+        }
+      };
+
+      const handleSetLang = (newLang) => {
+        setLang(newLang);
+        setSettings((prev) => {
+          const next = { ...prev, lang: newLang };
+          localStorage.setItem(profileSettingsKey, JSON.stringify(next));
+          return next;
+        });
+      };
+
+      const handleSettingsChange = (nextSettings) => {
+        setSettings(nextSettings);
+        localStorage.setItem(profileSettingsKey, JSON.stringify(nextSettings));
+      };
+
+      const handleUpdateSetting = (key, value) => {
+        setSettings((prev) => {
+          const next = { ...prev, [key]: value };
+          localStorage.setItem(profileSettingsKey, JSON.stringify(next));
+          return next;
+        });
+      };
       const syncProfile = (nextProfile = {}) => {
         const merged = {
           ...(window.FT_DATA.user || {}),
@@ -277,7 +322,32 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       useEffect(() => {
         const storedProfile = readProfileSettings(profileSettingsKey, window.FT_DATA.user || {});
         syncProfile(storedProfile || {});
+
+        if (window.loadSettings) {
+          const s = window.loadSettings(profileSettingsKey, storedProfile || window.FT_DATA.user || {});
+          setSettings(s);
+          if (s) {
+            if (s.lang && s.lang !== lang) {
+              setLang(s.lang);
+            }
+            if (s.theme !== undefined) {
+              const isDark = s.theme === 'dark';
+              if (tw.dark !== isDark) {
+                setTw('dark', isDark);
+              }
+            }
+            if (s.density && s.density !== tw.density) {
+              setTw('density', s.density);
+            }
+          }
+        }
       }, [profileSettingsKey]);
+
+      useEffect(() => {
+        if (state?.categories) {
+          window.FT_DATA.categories = state.categories;
+        }
+      }, [state?.categories]);
 
       // route
       const [route, setRoute] = useState(() => localStorage.getItem('ft_route') || 'dashboard');
@@ -504,7 +574,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
             <main className="ft-main">
               <Topbar title={titleMap[route] || 'FinTrack'}
                       search={search} setSearch={setSearch}
-                      lang={lang} onToggleLang={() => setLang(lang === 'id' ? 'en' : 'id')}
+                      lang={lang} onToggleLang={() => handleSetLang(lang === 'id' ? 'en' : 'id')}
                       onLogout={onLogout}
                       state={state} onNavigate={setRoute}
                       t={t} />
@@ -533,7 +603,9 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
                 {route === 'reports' && (
                   <Reports state={state} lang={lang} t={t} chartStyle={tw.chartStyle}
                            onExportExcel={onExportExcel}
-                           onExportCsv={onExportCsv} />
+                           onExportCsv={onExportCsv}
+                           settings={settings}
+                           onUpdateSetting={handleUpdateSetting} />
                 )}
                 {route === 'settings' && (
                   <Settings lang={lang} t={t}
@@ -542,12 +614,14 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
                             profile={profile}
                             settingsKey={profileSettingsKey}
                             onProfileChange={syncProfile}
-                            setLang={setLang}
-                            tw={tw} setTw={setTw}
+                            setLang={handleSetLang}
+                            tw={tw} setTw={handleSetTw}
                             onLogout={onLogout}
                             onExportExcel={onExportExcel}
                             onImportExcel={onImportExcel}
-                            onResetPrivateData={onResetPrivateData} />
+                            onResetPrivateData={onResetPrivateData}
+                            settings={settings}
+                            onSettingsChange={handleSettingsChange} />
                 )}
               </div>
             </main>
@@ -559,7 +633,8 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
           <QuickAddTx open={qaOpen} onClose={() => setQaOpen(false)}
                       onSave={onSave} initialType={qaInitialType}
                       lang={lang} t={t}
-                      accounts={state.accounts} categories={state.categories} />
+                      accounts={state.accounts} categories={state.categories}
+                      dispatch={dispatch} />
 
           <FinTrackTweaks tw={tw} setTw={setTw} lang={lang} />
           <ToastHost />

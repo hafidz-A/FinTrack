@@ -96,7 +96,7 @@ function Accounts({ state, dispatch, lang, t }) {
             {accounts.filter((a) => a.balance < 0 && !archived.includes(a.id)).length} {lang === 'id' ? 'kartu/pinjaman' : 'cards/loans'}
           </div>
         </div>
-        <div className="ft-card" style={{ background: 'linear-gradient(135deg, #1E3A5F, #2563EB)', color: 'white', border: 0, position: 'relative', overflow: 'hidden' }}>
+        <div className="ft-card acc-net-card">
           <div style={{ fontSize: 13, opacity: .8, fontWeight: 600 }}>{t('accounts.netPosition')}</div>
           <div style={{ fontFamily: 'var(--ft-font-display)', fontWeight: 700, fontSize: 32, letterSpacing: '-0.02em', marginTop: 8 }}>
             {formatIDR(totalAssets - totalLiabs, { compact: true })}
@@ -415,6 +415,12 @@ function Accounts({ state, dispatch, lang, t }) {
 }
 function Budgets({ state, dispatch, lang, t }) {
   const { budgets, transactions, categories } = state;
+  const { AddCustomCategoryModal } = window;
+  const [addCustomCatOpen, setAddCustomCatOpen] = useState(false);
+  const handleSaveCustomCat = (newCat) => {
+    dispatch({ type: 'ADD_CATEGORY', category: newCat });
+    setBCat(newCat.id);
+  };
   const [addOpen, setAddOpen] = useState(false);
   const [tmpl, setTmpl] = useState('custom');
   const [bCat, setBCat] = useState('food');
@@ -594,7 +600,14 @@ function Budgets({ state, dispatch, lang, t }) {
                 <span className="qa-cat-label">{lang === 'id' ? c.label : c.labelEn}</span>
               </button>
             ))}
+            <button type="button" className="qa-cat"
+                    style={{ border: '1px dashed var(--ft-border)', background: 'transparent' }}
+                    onClick={() => setAddCustomCatOpen(true)}>
+              <span className="qa-cat-emoji">➕</span>
+              <span className="qa-cat-label">{lang === 'id' ? 'Kategori Baru' : 'New Category'}</span>
+            </button>
           </div>
+          <AddCustomCategoryModal open={addCustomCatOpen} onClose={() => setAddCustomCatOpen(false)} onSave={handleSaveCustomCat} lang={lang} t={t} />
         </div>
         <div className="qa-row-2">
           <div>

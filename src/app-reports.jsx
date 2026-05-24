@@ -1,10 +1,75 @@
 // FinTrack — Reports & Analytics module.
 // Tabs: Profit & Loss · Cashflow · Category · Month-over-month comparison.
 
-function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv }) {
+const INDO_HOLIDAYS_2026 = {
+  "2026-01-01": { labelId: "Tahun Baru Masehi", labelEn: "New Year's Day", type: "national" },
+  "2026-01-16": { labelId: "Isra Mi'raj", labelEn: "Isra Mi'raj", type: "national" },
+  "2026-02-16": { labelId: "Cuti Bersama Imlek", labelEn: "Chinese New Year Collective Leave", type: "cuti" },
+  "2026-02-17": { labelId: "Tahun Baru Imlek", labelEn: "Chinese New Year", type: "national" },
+  "2026-03-18": { labelId: "Cuti Bersama Nyepi", labelEn: "Nyepi Collective Leave", type: "cuti" },
+  "2026-03-19": { labelId: "Hari Raya Nyepi", labelEn: "Hari Raya Nyepi", type: "national" },
+  "2026-03-20": { labelId: "Cuti Bersama Nyepi", labelEn: "Nyepi Collective Leave", type: "cuti" },
+  "2026-03-21": { labelId: "Hari Raya Idul Fitri", labelEn: "Idul Fitri Day 1", type: "national" },
+  "2026-03-22": { labelId: "Hari Raya Idul Fitri", labelEn: "Idul Fitri Day 2", type: "national" },
+  "2026-03-23": { labelId: "Cuti Bersama Idul Fitri", labelEn: "Idul Fitri Collective Leave", type: "cuti" },
+  "2026-03-24": { labelId: "Cuti Bersama Idul Fitri", labelEn: "Idul Fitri Collective Leave", type: "cuti" },
+  "2026-04-03": { labelId: "Wafat Yesus Kristus", labelEn: "Good Friday", type: "national" },
+  "2026-04-05": { labelId: "Kebangkitan Yesus Kristus (Paskah)", labelEn: "Easter Sunday", type: "national" },
+  "2026-05-01": { labelId: "Hari Buruh Internasional", labelEn: "Labour Day", type: "national" },
+  "2026-05-14": { labelId: "Kenaikan Yesus Kristus", labelEn: "Ascension Day of Jesus", type: "national" },
+  "2026-05-15": { labelId: "Cuti Bersama Kenaikan Yesus", labelEn: "Ascension Collective Leave", type: "cuti" },
+  "2026-05-27": { labelId: "Hari Raya Idul Adha", labelEn: "Idul Adha", type: "national" },
+  "2026-05-28": { labelId: "Cuti Bersama Idul Adha", labelEn: "Idul Adha Collective Leave", type: "cuti" },
+  "2026-05-31": { labelId: "Hari Raya Waisak", labelEn: "Waisak Day", type: "national" },
+  "2026-06-01": { labelId: "Hari Lahir Pancasila", labelEn: "Pancasila Day", type: "national" },
+  "2026-06-16": { labelId: "Tahun Baru Islam", labelEn: "Islamic New Year", type: "national" },
+  "2026-08-17": { labelId: "Hari Kemerdekaan RI", labelEn: "Independence Day", type: "national" },
+  "2026-08-25": { labelId: "Maulid Nabi Muhammad SAW", labelEn: "Mawlid", type: "national" },
+  "2026-12-24": { labelId: "Cuti Bersama Natal", labelEn: "Christmas Collective Leave", type: "cuti" },
+  "2026-12-25": { labelId: "Hari Raya Natal", labelEn: "Christmas Day", type: "national" }
+};
+
+const getActualPayday = (year, month, targetDay, includeCuti, exceptionMode) => {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const actualTargetDay = Math.min(targetDay, lastDay);
+  let current = new Date(year, month, actualTargetDay);
+
+  const checkIfHoliday = (d) => {
+    const dayOfWeek = d.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) return true; // weekend
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const key = `${yyyy}-${mm}-${dd}`;
+    const hol = INDO_HOLIDAYS_2026[key];
+    if (hol) {
+      if (hol.type === 'national') return true;
+      if (includeCuti && hol.type === 'cuti') return true;
+    }
+    return false;
+  };
+
+  let loops = 0;
+  while (checkIfHoliday(current) && loops < 30) {
+    if (exceptionMode === 'before') {
+      current.setDate(current.getDate() - 1);
+    } else {
+      current.setDate(current.getDate() + 1);
+    }
+    loops++;
+  }
+  return current;
+};
+
+function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, settings = {}, onUpdateSetting }) {
   const { transactions, categories } = state;
   const [period, setPeriod] = useState('month'); // month | last | 3m | 6m | year
-  const [tab, setTab] = useState('pl'); // pl | cashflow | category | comparison
+  const [tab, setTab] = useState('pl'); // pl | cashflow | category | comparison | calendar
+
+  // Calendar states
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  const [selectedDayTxs, setSelectedDayTxs] = useState(null);
 
   // Compute date range for the active period
   const range = useMemo(() => {
@@ -115,6 +180,139 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv }) {
     year: t('reports.periodYear'),
   };
 
+  // Calendar logic parameters
+  const calIncludeCuti = settings.calendarIncludeCuti !== false;
+  const calPayday = settings.calendarPayday ?? 25;
+  const calPaydayException = settings.calendarPaydayException ?? 'before';
+
+  const actualPaydayDate = useMemo(() => {
+    return getActualPayday(currentYear, currentMonth, calPayday, calIncludeCuti, calPaydayException);
+  }, [currentYear, currentMonth, calPayday, calIncludeCuti, calPaydayException]);
+
+  const prevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear(currentYear - 1);
+    } else {
+      setCurrentMonth(currentMonth - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear(currentYear + 1);
+    } else {
+      setCurrentMonth(currentMonth + 1);
+    }
+  };
+
+  const getMonthName = (m, l) => {
+    const idNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const enNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return l === 'id' ? idNames[m] : enNames[m];
+  };
+
+  const gridCells = useMemo(() => {
+    const cells = [];
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const prevDaysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+    const checkIfHoliday = (d) => {
+      const dayOfWeek = d.getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) return true;
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const key = `${yyyy}-${mm}-${dd}`;
+      const hol = INDO_HOLIDAYS_2026[key];
+      if (hol) {
+        if (hol.type === 'national') return true;
+        if (calIncludeCuti && hol.type === 'cuti') return true;
+      }
+      return false;
+    };
+
+    const getHoliday = (d) => {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const key = `${yyyy}-${mm}-${dd}`;
+      const hol = INDO_HOLIDAYS_2026[key];
+      if (hol) {
+        if (hol.type === 'national') return hol;
+        if (calIncludeCuti && hol.type === 'cuti') return hol;
+      }
+      return null;
+    };
+
+    // Prev month days
+    for (let i = firstDay - 1; i >= 0; i--) {
+      const day = prevDaysInMonth - i;
+      const cellDate = new Date(currentYear, currentMonth - 1, day);
+      cells.push({
+        day,
+        isCurrentMonth: false,
+        date: cellDate,
+        isHoliday: checkIfHoliday(cellDate),
+        holidayInfo: getHoliday(cellDate),
+        income: 0,
+        expense: 0,
+        txList: []
+      });
+    }
+
+    // Current month days
+    for (let i = 1; i <= daysInMonth; i++) {
+      const cellDate = new Date(currentYear, currentMonth, i);
+      const isActualPayday = cellDate.getFullYear() === actualPaydayDate.getFullYear() &&
+                             cellDate.getMonth() === actualPaydayDate.getMonth() &&
+                             cellDate.getDate() === actualPaydayDate.getDate();
+
+      const dayTxs = transactions.filter((tx) => {
+        const txD = new Date(tx.date);
+        return txD.getFullYear() === currentYear &&
+               txD.getMonth() === currentMonth &&
+               txD.getDate() === i;
+      });
+
+      const dayInc = dayTxs.filter(tx => tx.type === 'income').reduce((s, tx) => s + tx.amount, 0);
+      const dayExp = dayTxs.filter(tx => tx.type === 'expense').reduce((s, tx) => s + tx.amount, 0);
+
+      cells.push({
+        day: i,
+        isCurrentMonth: true,
+        date: cellDate,
+        isHoliday: checkIfHoliday(cellDate),
+        holidayInfo: getHoliday(cellDate),
+        isActualPayday,
+        income: dayInc,
+        expense: dayExp,
+        txList: dayTxs
+      });
+    }
+
+    // Next month days
+    const totalCells = cells.length;
+    const remaining = totalCells <= 35 ? 35 - totalCells : 42 - totalCells;
+    for (let i = 1; i <= remaining; i++) {
+      const cellDate = new Date(currentYear, currentMonth + 1, i);
+      cells.push({
+        day: i,
+        isCurrentMonth: false,
+        date: cellDate,
+        isHoliday: checkIfHoliday(cellDate),
+        holidayInfo: getHoliday(cellDate),
+        income: 0,
+        expense: 0,
+        txList: []
+      });
+    }
+
+    return cells;
+  }, [currentYear, currentMonth, actualPaydayDate, transactions, calIncludeCuti]);
+
   return (
     <div className="ft-fade-up">
       <div className="rp-head">
@@ -144,67 +342,71 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv }) {
       </div>
 
       {/* Period chips */}
-      <div className="rp-period-row">
-        {[
-          ['month', t('reports.periodMonth')],
-          ['last', t('reports.periodLast')],
-          ['3m', t('reports.period3m')],
-          ['6m', t('reports.period6m')],
-          ['year', t('reports.periodYear')],
-        ].map(([id, lbl]) => (
-          <button key={id} className="tx-chip" data-active={period === id} onClick={() => setPeriod(id)}>
-            {lbl}
-          </button>
-        ))}
-      </div>
+      {tab !== 'calendar' && (
+        <div className="rp-period-row">
+          {[
+            ['month', t('reports.periodMonth')],
+            ['last', t('reports.periodLast')],
+            ['3m', t('reports.period3m')],
+            ['6m', t('reports.period6m')],
+            ['year', t('reports.periodYear')],
+          ].map(([id, lbl]) => (
+            <button key={id} className="tx-chip" data-active={period === id} onClick={() => setPeriod(id)}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Summary cards */}
-      <div className="rp-summary">
-        <div className="rp-summary-card">
-          <div className="rp-summary-label">
-            <Icon name="arrowDownLeft" size={14} color="var(--ft-success)" />
-            {t('reports.totalIncome')}
+      {tab !== 'calendar' && (
+        <div className="rp-summary">
+          <div className="rp-summary-card">
+            <div className="rp-summary-label">
+              <Icon name="arrowDownLeft" size={14} color="var(--ft-success)" />
+              {t('reports.totalIncome')}
+            </div>
+            <div className="rp-summary-num" style={{ color: 'var(--ft-success)' }}>
+              +{formatIDR(totals.income, { compact: true })}
+            </div>
+            <div className="rp-summary-delta" style={{ color: 'var(--ft-text-3)' }}>{periodLabel[period]}</div>
           </div>
-          <div className="rp-summary-num" style={{ color: 'var(--ft-success)' }}>
-            +{formatIDR(totals.income, { compact: true })}
+          <div className="rp-summary-card">
+            <div className="rp-summary-label">
+              <Icon name="arrowUpRight" size={14} color="var(--ft-danger)" />
+              {t('reports.totalExpense')}
+            </div>
+            <div className="rp-summary-num">−{formatIDR(totals.expense, { compact: true })}</div>
+            <div className="rp-summary-delta" style={{ color: 'var(--ft-text-3)' }}>
+              {t('reports.avgPerDay')}: {formatIDR(totals.expense / dayCount, { compact: true })}
+            </div>
           </div>
-          <div className="rp-summary-delta" style={{ color: 'var(--ft-text-3)' }}>{periodLabel[period]}</div>
+          <div className="rp-summary-card">
+            <div className="rp-summary-label">
+              <Icon name="trending" size={14} color="var(--ft-action)" />
+              {t('reports.netIncome')}
+            </div>
+            <div className="rp-summary-num" style={{ color: totals.net >= 0 ? 'var(--ft-success)' : 'var(--ft-danger)' }}>
+              {formatIDR(totals.net, { compact: true, sign: true })}
+            </div>
+            <div className="rp-summary-delta" style={{ color: 'var(--ft-text-3)' }}>
+              {byCategory[0]?.category ? `${t('reports.topCategory')}: ${lang === 'id' ? byCategory[0].category.label : byCategory[0].category.labelEn}` : '—'}
+            </div>
+          </div>
+          <div className="rp-summary-card" data-tone="primary">
+            <div className="rp-summary-label">
+              <Icon name="sparkles" size={14} color="white" fill="white" />
+              {t('reports.savingsRate')}
+            </div>
+            <div className="rp-summary-num">{savingsRate}%</div>
+            <div className="rp-summary-delta" style={{ color: '#DFFB6E' }}>
+              {savingsRate >= 20 ? (lang === 'id' ? '✓ Sangat baik' : '✓ Excellent') :
+               savingsRate >= 10 ? (lang === 'id' ? 'Cukup baik' : 'Decent') :
+               (lang === 'id' ? 'Coba tingkatkan' : 'Could be better')}
+            </div>
+          </div>
         </div>
-        <div className="rp-summary-card">
-          <div className="rp-summary-label">
-            <Icon name="arrowUpRight" size={14} color="var(--ft-danger)" />
-            {t('reports.totalExpense')}
-          </div>
-          <div className="rp-summary-num">−{formatIDR(totals.expense, { compact: true })}</div>
-          <div className="rp-summary-delta" style={{ color: 'var(--ft-text-3)' }}>
-            {t('reports.avgPerDay')}: {formatIDR(totals.expense / dayCount, { compact: true })}
-          </div>
-        </div>
-        <div className="rp-summary-card">
-          <div className="rp-summary-label">
-            <Icon name="trending" size={14} color="var(--ft-action)" />
-            {t('reports.netIncome')}
-          </div>
-          <div className="rp-summary-num" style={{ color: totals.net >= 0 ? 'var(--ft-success)' : 'var(--ft-danger)' }}>
-            {formatIDR(totals.net, { compact: true, sign: true })}
-          </div>
-          <div className="rp-summary-delta" style={{ color: 'var(--ft-text-3)' }}>
-            {byCategory[0]?.category ? `${t('reports.topCategory')}: ${lang === 'id' ? byCategory[0].category.label : byCategory[0].category.labelEn}` : '—'}
-          </div>
-        </div>
-        <div className="rp-summary-card" data-tone="primary">
-          <div className="rp-summary-label">
-            <Icon name="sparkles" size={14} color="white" fill="white" />
-            {t('reports.savingsRate')}
-          </div>
-          <div className="rp-summary-num">{savingsRate}%</div>
-          <div className="rp-summary-delta" style={{ color: '#DFFB6E' }}>
-            {savingsRate >= 20 ? (lang === 'id' ? '✓ Sangat baik' : '✓ Excellent') :
-             savingsRate >= 10 ? (lang === 'id' ? 'Cukup baik' : 'Decent') :
-             (lang === 'id' ? 'Coba tingkatkan' : 'Could be better')}
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Tabs */}
       <div className="tx-filters" style={{ marginBottom: 20 }}>
@@ -213,6 +415,7 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv }) {
           ['cashflow', t('reports.tabCashflow')],
           ['category', t('reports.tabCategory')],
           ['comparison', t('reports.tabComparison')],
+          ['calendar', t('reports.tabCalendar')],
         ].map(([id, lbl]) => (
           <button key={id} className="tx-chip" data-active={tab === id} onClick={() => setTab(id)}>
             {lbl}
@@ -357,10 +560,161 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv }) {
           <MoMChart data={monthBuckets} lang={lang} />
         </div>
       )}
+
+      {/* Calendar tab */}
+      {tab === 'calendar' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Controls & Nav */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button type="button" className="ft-btn" data-variant="ghost" style={{ padding: '8px 12px' }} onClick={prevMonth}>
+                <Icon name="arrowRight" size={14} style={{ transform: 'rotate(180deg)' }} />
+              </button>
+              <span style={{ fontFamily: 'var(--ft-font-display)', fontWeight: 700, fontSize: 20, minWidth: 150, textAlign: 'center' }}>
+                {getMonthName(currentMonth, lang)} {currentYear}
+              </span>
+              <button type="button" className="ft-btn" data-variant="ghost" style={{ padding: '8px 12px' }} onClick={nextMonth}>
+                <Icon name="arrowRight" size={14} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>
+                <input type="checkbox" checked={calIncludeCuti} onChange={(e) => onUpdateSetting && onUpdateSetting('calendarIncludeCuti', e.target.checked)} />
+                {lang === 'id' ? 'Sertakan Cuti Bersama' : 'Include Cuti Bersama'}
+              </label>
+            </div>
+          </div>
+
+          {/* Payday Exceptions card */}
+          <div className="ft-card" style={{ padding: 18, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, background: 'rgba(255,255,255,.02)' }}>
+            <div>
+              <label className="ft-label" style={{ marginBottom: 6 }}>💰 {lang === 'id' ? 'Tanggal Gajian Target' : 'Target Payday'}</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="number" min="1" max="31" className="ft-input" style={{ width: 80 }} value={calPayday} 
+                       onChange={(e) => onUpdateSetting && onUpdateSetting('calendarPayday', Math.max(1, Math.min(31, Number(e.target.value) || 1)))} />
+                <span style={{ fontSize: 13, color: 'var(--ft-text-3)', fontWeight: 600 }}>{lang === 'id' ? 'setiap bulan' : 'of the month'}</span>
+              </div>
+            </div>
+            <div>
+              <label className="ft-label" style={{ marginBottom: 6 }}>⚙️ {lang === 'id' ? 'Aturan Libur / Tanggal Merah' : 'Holiday Exception Strategy'}</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="ft-btn" data-variant={calPaydayException === 'before' ? 'primary' : 'ghost'} data-size="sm" 
+                        onClick={() => onUpdateSetting && onUpdateSetting('calendarPaydayException', 'before')}>
+                  {lang === 'id' ? 'Sebelum Libur' : 'Before Holiday'}
+                </button>
+                <button type="button" className="ft-btn" data-variant={calPaydayException === 'after' ? 'primary' : 'ghost'} data-size="sm" 
+                        onClick={() => onUpdateSetting && onUpdateSetting('calendarPaydayException', 'after')}>
+                  {lang === 'id' ? 'Setelah Libur' : 'After Holiday'}
+                </button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ padding: '10px 14px', background: 'var(--ft-success-soft)', borderRadius: 12, border: '1px solid rgba(16,185,129,.15)', width: '100%' }}>
+                <div style={{ fontSize: 11, color: 'var(--ft-success)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {lang === 'id' ? 'Transfer Gaji Bulan Ini' : 'Actual Payday This Month'}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4 }}>
+                  {formatDateLong(actualPaydayDate.toISOString(), lang)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Calendar Grid */}
+          <div style={{ overflowX: 'auto', background: 'var(--ft-border)', borderRadius: 14, padding: 1 }}>
+            <div style={{ minWidth: 700, display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--ft-border)' }}>
+              {/* Day headers */}
+              {['Minggu / Sun', 'Senin / Mon', 'Selasa / Tue', 'Rabu / Wed', 'Kamis / Thu', 'Jumat / Fri', 'Sabtu / Sat'].map((h, i) => (
+                <div key={h} style={{ background: 'var(--ft-bg)', padding: '12px 6px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: i === 0 || i === 6 ? 'var(--ft-danger)' : 'var(--ft-text-3)' }}>
+                  {h}
+                </div>
+              ))}
+              {/* Cells */}
+              {gridCells.map((cell, idx) => {
+                const hasTxs = cell.txList.length > 0;
+                return (
+                  <div key={idx} 
+                       onClick={() => cell.isCurrentMonth && hasTxs && setSelectedDayTxs(cell)}
+                       style={{
+                         background: cell.isCurrentMonth ? 'var(--ft-surface)' : 'var(--ft-bg)',
+                         minHeight: 110, padding: 10, display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                         opacity: cell.isCurrentMonth ? 1 : 0.3,
+                         cursor: cell.isCurrentMonth && hasTxs ? 'pointer' : 'default',
+                         border: cell.isActualPayday ? '2px solid #EAB308' : 'none',
+                         boxShadow: cell.isActualPayday ? '0 0 12px rgba(234,179,8,.1) inset' : 'none',
+                         position: 'relative',
+                       }}
+                       className={cell.isCurrentMonth && hasTxs ? 'cal-cell-interactive' : ''}>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: cell.isHoliday ? 'var(--ft-danger)' : 'inherit' }}>
+                        {cell.day}
+                      </span>
+                      {cell.isActualPayday && (
+                        <span style={{ fontSize: 9, background: '#EAB308', color: '#000', fontWeight: 800, padding: '2px 4px', borderRadius: 4, textTransform: 'uppercase' }}>
+                          💰 Gajian
+                        </span>
+                      )}
+                    </div>
+
+                    {cell.holidayInfo && (
+                      <div style={{ fontSize: 10, color: 'var(--ft-danger)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 4, maxWidth: '100%' }}
+                           title={lang === 'id' ? cell.holidayInfo.labelId : cell.holidayInfo.labelEn}>
+                        {lang === 'id' ? cell.holidayInfo.labelId : cell.holidayInfo.labelEn}
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end' }}>
+                      {cell.income > 0 && (
+                        <div style={{ fontSize: 10.5, color: 'var(--ft-success)', fontWeight: 700 }}>
+                          +{formatIDR(cell.income, { compact: true })}
+                        </div>
+                      )}
+                      {cell.expense > 0 && (
+                        <div style={{ fontSize: 10.5, color: 'var(--ft-danger)', fontWeight: 700 }}>
+                          −{formatIDR(cell.expense, { compact: true })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Selected Day transactions details modal */}
+          <Modal open={!!selectedDayTxs} onClose={() => setSelectedDayTxs(null)}
+                 title={selectedDayTxs ? formatDateLong(new Date(currentYear, currentMonth, selectedDayTxs.day).toISOString(), lang) : ''}
+                 sub={lang === 'id' ? 'Daftar transaksi pada hari ini' : 'Transactions list on this day'}>
+            {selectedDayTxs && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {selectedDayTxs.txList.map((tx) => {
+                  const cat = getCategory(tx.category);
+                  return (
+                    <div key={tx.id} style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 12, borderBottom: '1px solid var(--ft-border)' }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 10, background: cat.color + '22', color: cat.color, display: 'grid', placeItems: 'center', fontSize: 16 }}>
+                        {cat.icon}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{tx.description}</div>
+                        <div style={{ fontSize: 12, color: 'var(--ft-text-3)', marginTop: 2 }}>
+                          {getAccount(tx.account, state.accounts)?.name || ''}
+                        </div>
+                      </div>
+                      <div style={{ fontWeight: 700, color: tx.type === 'income' ? 'var(--ft-success)' : 'inherit' }}>
+                        {tx.type === 'income' ? '+' : '−'}{formatIDR(tx.amount)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Modal>
+        </div>
+      )}
     </div>
   );
 }
-
 // ── Donut chart for category breakdown ─────────────────────────────────────
 function DonutChart({ data, total, lang }) {
   const r = 70, c = 2 * Math.PI * r;
