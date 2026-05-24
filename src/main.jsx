@@ -529,23 +529,6 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       );
     }
 
-    function AuthSocialButtons({ lang }) {
-      const disabledNotice = () => ToastBus.push(lang === 'id' ? 'SSO belum diaktifkan' : 'SSO is not enabled yet');
-      return (
-        <div className="ob-sso">
-          <button className="ob-sso-btn" type="button" onClick={disabledNotice}>
-            <span style={{ color: '#4285F4', fontWeight: 800, fontSize: 18 }}>G</span>
-            {lang === 'id' ? 'Lanjut dengan Google' : 'Continue with Google'}
-          </button>
-          <button className="ob-sso-btn" type="button" onClick={disabledNotice}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 20.28c-.98.95-2.05.86-3.08.43-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.43C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" /></svg>
-            {lang === 'id' ? 'Lanjut dengan Apple' : 'Continue with Apple'}
-          </button>
-          <div className="ob-divider">{lang === 'id' ? 'atau' : 'or'}</div>
-        </div>
-      );
-    }
-
     function SupabaseAuth({ lang, mode = 'signin', onDone }) {
       const [authMode, setAuthMode] = useState(mode);
       const [email, setEmail] = useState('');
@@ -636,8 +619,6 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
             <div className="ob-form">
               <h2 className="ob-form-title">{title}</h2>
               <p className="ob-form-sub">{subtitle}</p>
-
-              {(authMode === 'signin' || authMode === 'signup') && <AuthSocialButtons lang={lang} />}
 
               {authMode !== 'recovery' && (
                 <div className="ob-field-group">
