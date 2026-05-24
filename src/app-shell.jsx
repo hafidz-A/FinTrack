@@ -336,56 +336,57 @@ function Onboarding({ onDone, lang, t, initialMode = 'signin' }) {
   const leftTitle   = mode === 'signup' ? t('onboarding.welcomeTitle')   : t('onboarding.welcomeSigninTitle');
   const leftNote    = mode === 'signup' ? t('onboarding.welcomeNote')    : t('onboarding.welcomeSigninNote');
 
+  const isCentered = mode === 'forgot' || mode === 'forgot-sent';
   return (
-    <div className="ob-shell">
-      <div className="ob-left">
-        <div className="ob-left-content">
-          <div className="ob-left-brand">
-            <Logo />
-          </div>
-
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div className="ft-pill" style={{ background: 'rgba(255,255,255,.15)', color: 'white', alignSelf: 'flex-start' }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#DFFB6E' }} />
-              {leftEyebrow}
+    <div className="ob-shell" data-centered={isCentered ? "true" : "false"}>
+      {!isCentered && (
+        <div className="ob-left">
+          <div className="ob-left-content">
+            <div className="ob-left-brand">
+              <Logo />
             </div>
-            <h1 className="ob-left-headline">{leftTitle}</h1>
-            <p className="ob-left-sub">{leftNote}</p>
 
-            {mode === 'signup' && (
-              <>
-                <div className="ob-steps-strip">
-                  {Array.from({ length: stepCount }).map((_, i) => (
-                    <div key={i} className="ob-step-pip" data-active={i === step} data-done={i < step} />
-                  ))}
-                </div>
-                <div className="ob-step-titles">
-                  <span>{step + 1} / {stepCount}</span>
-                  <span>·</span>
-                  <span>{t(`onboarding.${stepTitleKey}`)}</span>
-                </div>
-              </>
-            )}
-          </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div className="ft-pill" style={{ background: 'rgba(255,255,255,.15)', color: 'white', alignSelf: 'flex-start', padding: '6px 12px', borderRadius: 999 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#DFFB6E', display: 'inline-block', marginRight: 6 }} />
+                {leftEyebrow}
+              </div>
+              <h1 className="ob-left-headline">{leftTitle}</h1>
+              <p className="ob-left-sub">{leftNote}</p>
 
-          {/* Decorative preview card */}
-          <div style={{
-            background: 'rgba(255,255,255,.10)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255,255,255,.18)',
-            borderRadius: 18, padding: 18, position: 'relative', marginTop: 32,
-          }}>
-            <div style={{ fontSize: 12, opacity: .8 }}>Total Saldo · Mock</div>
-            <div style={{ fontFamily: 'var(--ft-font-display)', fontSize: 32, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 4 }}>
-              Rp 70.685.000
+              {mode === 'signup' && (
+                <>
+                  <div className="ob-steps-strip">
+                    {Array.from({ length: stepCount }).map((_, i) => (
+                      <div key={i} className="ob-step-pip" data-active={i === step} data-done={i < step} />
+                    ))}
+                  </div>
+                  <div className="ob-step-titles">
+                    <span>{step + 1}/{stepCount} • {t(`onboarding.${stepTitleKey}`)}</span>
+                  </div>
+                </>
+              )}
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-              <span className="ft-pill" style={{ background: 'rgba(223,251,110,.2)', color: '#DFFB6E' }}>↗ +47jt</span>
-              <span className="ft-pill" style={{ background: 'rgba(255,255,255,.12)', color: 'white' }}>↘ −12jt</span>
+
+            {/* Decorative preview card */}
+            <div style={{
+              background: 'rgba(255,255,255,.10)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255,255,255,.18)',
+              borderRadius: 18, padding: 18, position: 'relative', marginTop: 32,
+            }}>
+              <div style={{ fontSize: 12, opacity: .8 }}>Total Saldo · Mock</div>
+              <div style={{ fontFamily: 'var(--ft-font-display)', fontSize: 32, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 4 }}>
+                Rp 70.685.000
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                <span className="ft-pill" style={{ background: 'rgba(223,251,110,.2)', color: '#DFFB6E', fontWeight: 600 }}>↗ +47jt</span>
+                <span className="ft-pill" style={{ background: 'rgba(255,255,255,.12)', color: 'white', fontWeight: 600 }}>↘ −12jt</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="ob-right">
         <div className="ob-form">
@@ -395,24 +396,12 @@ function Onboarding({ onDone, lang, t, initialMode = 'signin' }) {
               <h2 className="ob-form-title">{t('onboarding.signInTitle')}</h2>
               <p className="ob-form-sub">{t('onboarding.signInSub')}</p>
 
-              <div className="ob-sso">
-                <button className="ob-sso-btn" type="button">
-                  <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A10.99 10.99 0 0 0 12 23z" /><path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.94l3.66-2.84z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" /></svg>
-                  {t('onboarding.ssoGoogle')}
-                </button>
-                <button className="ob-sso-btn" type="button">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.86-3.08.43-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.43C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" /></svg>
-                  {t('onboarding.ssoApple')}
-                </button>
-                <div className="ob-divider">{t('onboarding.or')}</div>
-              </div>
-
               <div className="ob-field-group">
                 <label className="ft-label">{t('onboarding.emailLabel')}</label>
                 <input className="ft-input" type="email"
                        value={form.email} onChange={(e) => update('email', e.target.value)}
                        aria-invalid={!!errors.email}
-                       placeholder="kamu@email.com" />
+                       placeholder="andi@studiowiyono.id" />
                 {errors.email && <div style={{ color: 'var(--ft-danger)', fontSize: 12, marginTop: 6, fontWeight: 600 }}>{errors.email}</div>}
               </div>
               <div className="ob-field-group">
@@ -437,7 +426,7 @@ function Onboarding({ onDone, lang, t, initialMode = 'signin' }) {
               </label>
 
               <div className="ob-actions">
-                <button className="ft-btn" data-variant="primary" onClick={goNext} style={{ flex: 1 }}>
+                <button className="ft-btn" data-variant="primary" data-size="lg" onClick={goNext} style={{ flex: 1 }}>
                   {t('onboarding.signInCta')}
                   <Icon name="arrowRight" size={16} />
                 </button>
@@ -455,7 +444,7 @@ function Onboarding({ onDone, lang, t, initialMode = 'signin' }) {
           {/* —— FORGOT PASSWORD —— */}
           {mode === 'forgot' && (
             <>
-              <button className="ft-link" type="button" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 16 }}
+              <button className="ft-link" type="button" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 20 }}
                       onClick={() => { setMode('signin'); setErrors({}); }}>
                 <Icon name="arrowRight" size={14} style={{ transform: 'rotate(180deg)' }} />
                 {t('onboarding.forgotBack')}
@@ -468,12 +457,12 @@ function Onboarding({ onDone, lang, t, initialMode = 'signin' }) {
                 <input className="ft-input" type="email"
                        value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)}
                        aria-invalid={!!errors.forgotEmail}
-                       placeholder="kamu@email.com" autoFocus />
+                       placeholder="andi@studiowiyono.id" autoFocus />
                 {errors.forgotEmail && <div style={{ color: 'var(--ft-danger)', fontSize: 12, marginTop: 6, fontWeight: 600 }}>{errors.forgotEmail}</div>}
               </div>
 
               <div className="ob-actions">
-                <button className="ft-btn" data-variant="primary" onClick={submitForgot} style={{ flex: 1 }}>
+                <button className="ft-btn" data-variant="primary" data-size="lg" onClick={submitForgot} style={{ flex: 1 }}>
                   {t('onboarding.forgotCta')}
                   <Icon name="arrowRight" size={16} />
                 </button>
@@ -510,12 +499,12 @@ function Onboarding({ onDone, lang, t, initialMode = 'signin' }) {
               </p>
 
               <div className="ob-actions" style={{ flexDirection: 'column', gap: 10 }}>
-                <button className="ft-btn" data-variant="primary"
+                <button className="ft-btn" data-variant="primary" data-size="lg"
                         onClick={() => { setMode('signin'); setErrors({}); }}
                         style={{ width: '100%' }}>
                   {t('onboarding.forgotBack')}
                 </button>
-                <button className="ft-btn" data-variant="ghost"
+                <button className="ft-btn" data-variant="ghost" data-size="lg"
                         onClick={() => ToastBus.push(lang === 'id' ? 'Email dikirim ulang' : 'Email resent')}
                         style={{ width: '100%' }}>
                   {t('onboarding.forgotResend')}
@@ -527,7 +516,7 @@ function Onboarding({ onDone, lang, t, initialMode = 'signin' }) {
           {/* —— SIGN UP MULTISTEP —— */}
           {mode === 'signup' && (
             <>
-              <button className="ft-link" type="button" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 16 }}
+              <button className="ft-link" type="button" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 20 }}
                       onClick={() => { setMode('signin'); setStep(0); setErrors({}); }}>
                 <Icon name="arrowRight" size={14} style={{ transform: 'rotate(180deg)' }} />
                 {t('onboarding.signIn')}
@@ -539,24 +528,12 @@ function Onboarding({ onDone, lang, t, initialMode = 'signin' }) {
               {/* Step 0 — credentials */}
               {step === 0 && (
                 <>
-                  <div className="ob-sso">
-                    <button className="ob-sso-btn" type="button">
-                      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A10.99 10.99 0 0 0 12 23z" /><path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.94l3.66-2.84z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" /></svg>
-                      {t('onboarding.ssoGoogle')}
-                    </button>
-                    <button className="ob-sso-btn" type="button">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.86-3.08.43-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.43C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" /></svg>
-                      {t('onboarding.ssoApple')}
-                    </button>
-                    <div className="ob-divider">{t('onboarding.or')}</div>
-                  </div>
-
                   <div className="ob-field-group">
                     <label className="ft-label">{t('onboarding.emailLabel')}</label>
                     <input className="ft-input" type="email"
                            value={form.email} onChange={(e) => update('email', e.target.value)}
                            aria-invalid={!!errors.email}
-                           placeholder="kamu@email.com" />
+                           placeholder="andi@studiowiyono.id" />
                     {errors.email && <div style={{ color: 'var(--ft-danger)', fontSize: 12, marginTop: 6, fontWeight: 600 }}>{errors.email}</div>}
                   </div>
                   <div className="ob-field-group">
@@ -663,12 +640,12 @@ function Onboarding({ onDone, lang, t, initialMode = 'signin' }) {
 
               <div className="ob-actions">
                 {step > 0 && (
-                  <button className="ft-btn" data-variant="ghost" onClick={goBack}>
+                  <button className="ft-btn" data-variant="ghost" data-size="lg" onClick={goBack}>
                     <Icon name="arrowRight" size={16} style={{ transform: 'rotate(180deg)' }} />
                     <span>{t('common.back')}</span>
                   </button>
                 )}
-                <button className="ft-btn" data-variant="primary" onClick={goNext} style={{ flex: 1 }}>
+                <button className="ft-btn" data-variant="primary" data-size="lg" onClick={goNext} style={{ flex: 1 }}>
                   {step === 3 ? t('onboarding.finishCta') : t('common.next')}
                   {step !== 3 && <Icon name="arrowRight" size={16} />}
                 </button>

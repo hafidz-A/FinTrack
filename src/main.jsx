@@ -589,19 +589,19 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
           <div className="ob-left-content">
             <div className="ob-left-brand"><Logo /></div>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div className="ft-pill" style={{ background: 'rgba(255,255,255,.15)', color: 'white', alignSelf: 'flex-start' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#DFFB6E' }} />
+              <div className="ft-pill" style={{ background: 'rgba(255,255,255,.15)', color: 'white', alignSelf: 'flex-start', padding: '6px 12px', borderRadius: 999 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#DFFB6E', display: 'inline-block', marginRight: 6 }} />
                 {eyebrow}
               </div>
               <h1 className="ob-left-headline">{title}</h1>
               <p className="ob-left-sub">{note}</p>
             </div>
             <div style={{ background: 'rgba(255,255,255,.10)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 18, padding: 18, position: 'relative', marginTop: 32 }}>
-              <div style={{ fontSize: 12, opacity: .8 }}>Total Saldo - Mock</div>
+              <div style={{ fontSize: 12, opacity: .8 }}>Total Saldo · Mock</div>
               <div style={{ fontFamily: 'var(--ft-font-display)', fontSize: 32, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 4 }}>Rp 70.685.000</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                <span className="ft-pill" style={{ background: 'rgba(223,251,110,.2)', color: '#DFFB6E' }}>+47jt</span>
-                <span className="ft-pill" style={{ background: 'rgba(255,255,255,.12)', color: 'white' }}>-12jt</span>
+                <span className="ft-pill" style={{ background: 'rgba(223,251,110,.2)', color: '#DFFB6E', fontWeight: 600 }}>↗ +47jt</span>
+                <span className="ft-pill" style={{ background: 'rgba(255,255,255,.12)', color: 'white', fontWeight: 600 }}>↘ −12jt</span>
               </div>
             </div>
           </div>
@@ -692,11 +692,33 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
           ? (lang === 'id' ? 'Reset hanya mengubah password akun. Isi vault tetap perlu password vault atau recovery code.' : 'Reset only changes the account password. Vault data still needs a vault password or recovery code.')
           : (lang === 'id' ? 'Masuk untuk lihat update keuanganmu hari ini.' : "Sign in to see today's finance updates.");
 
+      const isCentered = authMode === 'reset' || authMode === 'recovery';
       return (
-        <div className="ob-shell">
-          <AuthLeftPanel eyebrow={title} title={leftTitle} note={leftNote} />
+        <div className="ob-shell" data-centered={isCentered ? "true" : "false"}>
+          {!isCentered && (
+            <AuthLeftPanel
+              eyebrow={authMode === 'signup' ? (lang === 'id' ? 'Selamat datang di FinTrack' : 'Welcome to FinTrack') : (lang === 'id' ? 'Masuk ke FinTrack' : 'Sign in to FinTrack')}
+              title={leftTitle}
+              note={leftNote}
+            />
+          )}
           <div className="ob-right">
             <div className="ob-form">
+              {authMode === 'signup' && (
+                <button className="ft-link" type="button" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 20 }}
+                        onClick={() => clearMode('signin')}>
+                  <Icon name="arrowRight" size={14} style={{ transform: 'rotate(180deg)' }} />
+                  {lang === 'id' ? 'Masuk' : 'Sign in'}
+                </button>
+              )}
+              {authMode === 'reset' && (
+                <button className="ft-link" type="button" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 20 }}
+                        onClick={() => clearMode('signin')}>
+                  <Icon name="arrowRight" size={14} style={{ transform: 'rotate(180deg)' }} />
+                  {lang === 'id' ? 'Kembali ke login' : 'Back to sign in'}
+                </button>
+              )}
+
               <h2 className="ob-form-title">{title}</h2>
               <p className="ob-form-sub">{subtitle}</p>
 
@@ -718,6 +740,11 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
                     )}
                   </div>
                   <input className="ft-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="********" />
+                  {authMode === 'signup' && (
+                    <div style={{ fontSize: 12, color: 'var(--ft-text-3)', marginTop: 6, fontWeight: 600 }}>
+                      {lang === 'id' ? 'Minimal 8 karakter, dengan angka' : 'At least 8 characters with a number'}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -746,9 +773,11 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
                   : authMode === 'recovery'
                     ? (lang === 'id' ? 'Simpan password baru' : 'Save new password')
                     : authMode === 'signup'
-                      ? (lang === 'id' ? 'Buat akun' : 'Create account')
+                      ? (lang === 'id' ? 'Berikutnya' : 'Next')
                     : (lang === 'id' ? 'Masuk ke akunku' : 'Sign in to my account')}
                 {authMode === 'signin' && <Icon name="arrowRight" size={16} />}
+                {authMode === 'signup' && <Icon name="arrowRight" size={16} />}
+                {authMode === 'reset' && <Icon name="arrowRight" size={16} />}
               </button>
 
               {authMode === 'signin' && (
@@ -758,12 +787,6 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
                     {lang === 'id' ? 'Buat akun' : 'Create account'}
                   </button>
                 </div>
-              )}
-
-              {(authMode === 'reset' || authMode === 'signup') && (
-                <button className="ft-link" style={{ marginTop: 16, fontSize: 13 }} onClick={() => clearMode('signin')}>
-                  {lang === 'id' ? 'Kembali ke login' : 'Back to sign in'}
-                </button>
               )}
             </div>
           </div>
