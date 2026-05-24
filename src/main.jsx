@@ -205,6 +205,11 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
 
     // App root
     function App() {
+      // app state (reducer-managed; seeded from FT_DATA)
+      const [state, dispatch] = useReducer(appReducer, null, () => ({
+        ...window.FinTrackExcel.getState(),
+      }));
+
       // tweaks
       const [tw, setTw] = useTweaks(TWEAK_DEFAULTS);
 
@@ -353,10 +358,6 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       const [route, setRoute] = useState(() => localStorage.getItem('ft_route') || 'dashboard');
       useEffect(() => { localStorage.setItem('ft_route', route); }, [route]);
 
-      // app state (reducer-managed; seeded from FT_DATA)
-      const [state, dispatch] = useReducer(appReducer, null, () => ({
-        ...window.FinTrackExcel.getState(),
-      }));
       useEffect(() => {
         if (!supabaseMode) {
           window.FinTrackExcel.saveState(state);

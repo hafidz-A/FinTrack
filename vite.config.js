@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   build: {
     target: 'esnext',
+    chunkSizeWarningLimit: 1600,
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
