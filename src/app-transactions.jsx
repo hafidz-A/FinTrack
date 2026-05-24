@@ -269,7 +269,7 @@ function Transactions({ state, dispatch, lang, t, search, onOpenAdd }) {
 }
 
 // ── QuickAddTx Modal ────────────────────────────────────────────────────────
-function QuickAddTx({ open, onClose, onSave, initialType = 'expense', lang, t, accounts, categories, dispatch }) {
+function QuickAddTx({ open, onClose, onSave, initialType = 'expense', lang, t, accounts, categories, dispatch, prefill, onDismiss }) {
   const { AddCustomCategoryModal } = window;
   const [addCustomCatOpen, setAddCustomCatOpen] = useState(false);
   const handleSaveCustomCat = (newCat) => {
@@ -288,11 +288,22 @@ function QuickAddTx({ open, onClose, onSave, initialType = 'expense', lang, t, a
 
   useEffect(() => {
     if (open) {
-      setType(initialType);
-      setAmount(''); setDescription(''); setError('');
-      setCategory(initialType === 'income' ? 'income' : initialType === 'transfer' ? 'transfer' : 'food');
+      if (prefill) {
+        setType(prefill.type || initialType);
+        setAmount(prefill.amount ? String(prefill.amount) : '');
+        setDescription(prefill.description || '');
+        setCategory(prefill.category || (prefill.type === 'income' ? 'income' : 'food'));
+        setAccount(prefill.account || accounts[0]?.id);
+        setDate(prefill.date || new Date().toISOString().slice(0, 10));
+        setRecurring('none');
+        setError('');
+      } else {
+        setType(initialType);
+        setAmount(''); setDescription(''); setError('');
+        setCategory(initialType === 'income' ? 'income' : initialType === 'transfer' ? 'transfer' : 'food');
+      }
     }
-  }, [open, initialType]);
+  }, [open, initialType, prefill]);
 
   const submit = () => {
     const amt = Number(amount.replace(/\D/g, ''));
@@ -332,6 +343,25 @@ function QuickAddTx({ open, onClose, onSave, initialType = 'expense', lang, t, a
                </button>
              </>
            }>
+      {/* Schedule banner */}
+      {prefill && prefill._scheduleName && (
+        <div className="qa-schedule-banner">
+          <div className="qa-schedule-banner-emoji">{prefill._scheduleEmoji || '📅'}</div>
+          <div className="qa-schedule-banner-text">
+            <div className="qa-schedule-banner-title">📅 {prefill._scheduleName}</div>
+            <div className="qa-schedule-banner-date">
+              {lang === 'id' ? 'Jatuh tempo: ' : 'Due: '}
+              {prefill._dueDate ? new Date(prefill._dueDate + 'T00:00:00').toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+            </div>
+          </div>
+          {onDismiss && (
+            <button type="button" className="qa-schedule-dismiss" onClick={onDismiss}>
+              {lang === 'id' ? 'Nanti saja' : 'Later'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* type segmented */}
       <div className="qa-types">
         {['expense', 'income', 'transfer'].map((typ) => (

@@ -61,10 +61,132 @@ const getActualPayday = (year, month, targetDay, includeCuti, exceptionMode) => 
   return current;
 };
 
-function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, settings = {}, onUpdateSetting }) {
+const SCHEDULE_EMOJIS = ['💰','📱','🏠','💡','🚗','🎓','💳','🛒','🏥','📺','🎮','🍜','✈️','🎵','📦','💼','⚡','🔔','🎁','🏋️'];
+
+function Reports({ state, dispatch, lang, t, chartStyle, onExportExcel, onExportCsv, settings = {}, onUpdateSetting, getNextOccurrence }) {
   const { transactions, categories } = state;
-  const [period, setPeriod] = useState('month'); // month | last | 3m | 6m | year
-  const [tab, setTab] = useState('pl'); // pl | cashflow | category | comparison | calendar
+  const scheduledTx = state.scheduledTx || [];
+  const [period, setPeriod] = useState('month');
+  const [tab, setTab] = useState('pl');
+
+  // Schedule management state
+  const [schModalOpen, setSchModalOpen] = useState(false);
+  const [schEditing, setSchEditing] = useState(null);
+  const [schDelTarget, setSchDelTarget] = useState(null);
+  const [schForm, setSchForm] = useState({
+    label: '', emoji: '💰', type: 'income', amount: '', category: 'income',
+    account: state.accounts[0]?.id || '', description: '', startDate: new Date().toISOString().slice(0,10),
+    endDate: '', recType: 'monthly', recInterval: 1, recUnit: 'months', recDayOfMonth: 25,
+    respectHolidays: true, holidayException: 'before',
+  });
+
+  const openSchAdd = () => {
+    setSchEditing(null);
+    setSchForm({
+      label: '', emoji: '💰', type: 'income', amount: '', category: 'income',
+      account: state.accounts[0]?.id || '', description: '', startDate: new Date().toISOString().slice(0,10),
+      endDate: '', recType: 'monthly', recInterval: 1, recUnit: 'months', recDayOfMonth: 25,
+      respectHolidays: true, holidayException: 'before',
+    });
+    setSchModalOpen(true);
+  };
+
+  const openSchEdit = (sch) => {
+    setSchEditing(sch);
+    const rec = sch.recurrence || {};
+    setSchForm({
+      label: sch.label, emoji: sch.emoji || '💰', type: sch.type || 'income',
+      amount: sch.amount ? String(sch.amount) : '', category: sch.category || 'income',
+      account: sch.account || state.accounts[0]?.id || '',
+      description: sch.description || '', startDate: sch.startDate || '',
+      endDate: sch.endDate || '',
+      recType: rec.type || 'monthly', recInterval: rec.interval || 1,
+      recUnit: rec.unit || 'months', recDayOfMonth: rec.dayOfMonth || 25,
+      respectHolidays: rec.respectHolidays !== false, holidayException: rec.holidayException || 'before',
+    });
+    setSchModalOpen(true);
+  };
+
+  const saveSch = () => {
+    if (!schForm.label.trim()) return;
+    const rec = {
+      type: schForm.recType, interval: Number(schForm.recInterval) || 1,
+      unit: schForm.recUnit, dayOfMonth: Number(schForm.recDayOfMonth) || 1,
+      respectHolidays: schForm.respectHolidays, holidayException: schForm.holidayException,
+    };
+    const data = {
+      label: schForm.label, emoji: schForm.emoji, type: schForm.type,
+      amount: Number(String(schForm.amount).replace(/\D/g, '')) || 0,
+      category: schForm.category, account: schForm.account,
+      description: schForm.description || schForm.label,
+      startDate: schForm.startDate, endDate: schForm.endDate || null,
+      recurrence: rec,
+    };
+    if (schEditing) {
+      dispatch({ type: 'EDIT_SCHEDULED', id: schEditing.id, updates: data });
+      ToastBus.push(lang === 'id' ? 'Jadwal diperbarui' : 'Schedule updated');
+    } else {
+      dispatch({ type: 'ADD_SCHEDULED', scheduled: { id: 'sch_' + Date.now(), ...data, createdAt: new Date().toISOString() } });
+      ToastBus.push(lang === 'id' ? 'Jadwal ditambahkan' : 'Schedule added');
+    }
+    setSchModalOpen(false);
+  };
+
+  const deleteSch = () => {
+    if (!schDelTarget) return;
+    dispatch({ type: 'DEL_SCHEDULED', id: schDelTarget.id });
+    ToastBus.push(lang === 'id' ? 'Jadwal dihapus' : 'Schedule deleted');
+    setSchDelTarget(null);
+  };
+
+  // Helper: describe recurrence in human language
+  const describeRec = (sch) => {
+    const r = sch.recurrence;
+    if (!r || r.type === 'none') return lang === 'id' ? 'Tidak berulang' : 'One-time';
+    const iv = r.interval || 1;
+    const u = r.unit || r.type;
+    const units = { daily: lang === 'id' ? 'hari' : 'day(s)', weekly: lang === 'id' ? 'minggu' : 'week(s)',
+      monthly: lang === 'id' ? 'bulan' : 'month(s)', yearly: lang === 'id' ? 'tahun' : 'year(s)',
+      days: lang === 'id' ? 'hari' : 'day(s)', weeks: lang === 'id' ? 'minggu' : 'week(s)',
+      months: lang === 'id' ? 'bulan' : 'month(s)', years: lang === 'id' ? 'tahun' : 'year(s)' };
+    const uLabel = units[u] || u;
+    if (iv === 1 && (u === 'monthly' || u === 'months')) return (lang === 'id' ? 'Bulanan, tgl ' : 'Monthly, day ') + (r.dayOfMonth || '1');
+    if (iv === 1 && (u === 'weekly' || u === 'weeks')) return lang === 'id' ? 'Mingguan' : 'Weekly';
+    if (iv === 1 && (u === 'daily' || u === 'days')) return lang === 'id' ? 'Harian' : 'Daily';
+    if (iv === 1 && (u === 'yearly' || u === 'years')) return lang === 'id' ? 'Tahunan' : 'Yearly';
+    return (lang === 'id' ? 'Setiap ' : 'Every ') + iv + ' ' + uLabel;
+  };
+
+  // Compute scheduled items for current calendar month
+  const scheduledForMonth = useMemo(() => {
+    if (!getNextOccurrence) return {};
+    const map = {}; // dayOfMonth -> ScheduledItem[]
+    scheduledTx.forEach((sch) => {
+      const rec = sch.recurrence || {};
+      // For monthly: check if dayOfMonth falls in this month
+      if (rec.type === 'monthly' || (rec.type === 'custom' && rec.unit === 'months')) {
+        const start = new Date(sch.startDate + 'T00:00:00');
+        const monthStart = new Date(currentYear, currentMonth, 1);
+        if (start <= new Date(currentYear, currentMonth + 1, 0)) {
+          if (!sch.endDate || new Date(sch.endDate) >= monthStart) {
+            const d = Math.min(rec.dayOfMonth || start.getDate(), new Date(currentYear, currentMonth + 1, 0).getDate());
+            (map[d] = map[d] || []).push(sch);
+          }
+        }
+      } else {
+        // For other recurrence types, check each day
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        for (let day = 1; day <= daysInMonth; day++) {
+          const ref = new Date(currentYear, currentMonth, day);
+          const next = getNextOccurrence(sch, ref);
+          if (next && next.getFullYear() === currentYear && next.getMonth() === currentMonth && next.getDate() === day) {
+            (map[day] = map[day] || []).push(sch);
+          }
+        }
+      }
+    });
+    return map;
+  }, [scheduledTx, currentYear, currentMonth, getNextOccurrence]);
 
   // Calendar states
   const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
@@ -182,12 +304,6 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, setti
 
   // Calendar logic parameters
   const calIncludeCuti = settings.calendarIncludeCuti !== false;
-  const calPayday = settings.calendarPayday ?? 25;
-  const calPaydayException = settings.calendarPaydayException ?? 'before';
-
-  const actualPaydayDate = useMemo(() => {
-    return getActualPayday(currentYear, currentMonth, calPayday, calIncludeCuti, calPaydayException);
-  }, [currentYear, currentMonth, calPayday, calIncludeCuti, calPaydayException]);
 
   const prevMonth = () => {
     if (currentMonth === 0) {
@@ -266,9 +382,7 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, setti
     // Current month days
     for (let i = 1; i <= daysInMonth; i++) {
       const cellDate = new Date(currentYear, currentMonth, i);
-      const isActualPayday = cellDate.getFullYear() === actualPaydayDate.getFullYear() &&
-                             cellDate.getMonth() === actualPaydayDate.getMonth() &&
-                             cellDate.getDate() === actualPaydayDate.getDate();
+      const dayScheduled = scheduledForMonth[i] || [];
 
       const dayTxs = transactions.filter((tx) => {
         const txD = new Date(tx.date);
@@ -286,7 +400,7 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, setti
         date: cellDate,
         isHoliday: checkIfHoliday(cellDate),
         holidayInfo: getHoliday(cellDate),
-        isActualPayday,
+        scheduled: dayScheduled,
         income: dayInc,
         expense: dayExp,
         txList: dayTxs
@@ -311,7 +425,7 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, setti
     }
 
     return cells;
-  }, [currentYear, currentMonth, actualPaydayDate, transactions, calIncludeCuti]);
+  }, [currentYear, currentMonth, transactions, calIncludeCuti, scheduledForMonth]);
 
   return (
     <div className="ft-fade-up">
@@ -416,6 +530,7 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, setti
           ['category', t('reports.tabCategory')],
           ['comparison', t('reports.tabComparison')],
           ['calendar', t('reports.tabCalendar')],
+          ['schedule', lang === 'id' ? '📅 Jadwal' : '📅 Schedule'],
         ].map(([id, lbl]) => (
           <button key={id} className="tx-chip" data-active={tab === id} onClick={() => setTab(id)}>
             {lbl}
@@ -585,40 +700,22 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, setti
             </div>
           </div>
 
-          {/* Payday Exceptions card */}
-          <div className="ft-card" style={{ padding: 18, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, background: 'rgba(255,255,255,.02)' }}>
-            <div>
-              <label className="ft-label" style={{ marginBottom: 6 }}>💰 {lang === 'id' ? 'Tanggal Gajian Target' : 'Target Payday'}</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="number" min="1" max="31" className="ft-input" style={{ width: 80 }} value={calPayday} 
-                       onChange={(e) => onUpdateSetting && onUpdateSetting('calendarPayday', Math.max(1, Math.min(31, Number(e.target.value) || 1)))} />
-                <span style={{ fontSize: 13, color: 'var(--ft-text-3)', fontWeight: 600 }}>{lang === 'id' ? 'setiap bulan' : 'of the month'}</span>
-              </div>
-            </div>
-            <div>
-              <label className="ft-label" style={{ marginBottom: 6 }}>⚙️ {lang === 'id' ? 'Aturan Libur / Tanggal Merah' : 'Holiday Exception Strategy'}</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className="ft-btn" data-variant={calPaydayException === 'before' ? 'primary' : 'ghost'} data-size="sm" 
-                        onClick={() => onUpdateSetting && onUpdateSetting('calendarPaydayException', 'before')}>
-                  {lang === 'id' ? 'Sebelum Libur' : 'Before Holiday'}
-                </button>
-                <button type="button" className="ft-btn" data-variant={calPaydayException === 'after' ? 'primary' : 'ghost'} data-size="sm" 
-                        onClick={() => onUpdateSetting && onUpdateSetting('calendarPaydayException', 'after')}>
-                  {lang === 'id' ? 'Setelah Libur' : 'After Holiday'}
-                </button>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ padding: '10px 14px', background: 'var(--ft-success-soft)', borderRadius: 12, border: '1px solid rgba(16,185,129,.15)', width: '100%' }}>
-                <div style={{ fontSize: 11, color: 'var(--ft-success)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {lang === 'id' ? 'Transfer Gaji Bulan Ini' : 'Actual Payday This Month'}
+          {/* Scheduled info card */}
+          {scheduledTx.length > 0 && (
+            <div className="ft-card" style={{ padding: 18, display: 'flex', alignItems: 'center', gap: 16, background: 'rgba(255,255,255,.02)' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ft-text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {lang === 'id' ? 'Jadwal Aktif' : 'Active Schedules'}
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4 }}>
-                  {formatDateLong(actualPaydayDate.toISOString(), lang)}
+                  {scheduledTx.length} {lang === 'id' ? 'jadwal terdaftar' : 'registered schedules'}
                 </div>
               </div>
+              <button type="button" className="ft-btn" data-variant="ghost" data-size="sm" onClick={() => setTab('schedule')}>
+                {lang === 'id' ? 'Kelola Jadwal' : 'Manage'}
+              </button>
             </div>
-          </div>
+          )}
 
           {/* Calendar Grid */}
           <div style={{ overflowX: 'auto', background: 'var(--ft-border)', borderRadius: 14, padding: 1 }}>
@@ -632,6 +729,7 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, setti
               {/* Cells */}
               {gridCells.map((cell, idx) => {
                 const hasTxs = cell.txList.length > 0;
+                const hasSch = (cell.scheduled || []).length > 0;
                 return (
                   <div key={idx} 
                        onClick={() => cell.isCurrentMonth && hasTxs && setSelectedDayTxs(cell)}
@@ -640,8 +738,8 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, setti
                          minHeight: 110, padding: 10, display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                          opacity: cell.isCurrentMonth ? 1 : 0.3,
                          cursor: cell.isCurrentMonth && hasTxs ? 'pointer' : 'default',
-                         border: cell.isActualPayday ? '2px solid #EAB308' : 'none',
-                         boxShadow: cell.isActualPayday ? '0 0 12px rgba(234,179,8,.1) inset' : 'none',
+                         border: hasSch ? '2px solid #EAB308' : 'none',
+                         boxShadow: hasSch ? '0 0 12px rgba(234,179,8,.1) inset' : 'none',
                          position: 'relative',
                        }}
                        className={cell.isCurrentMonth && hasTxs ? 'cal-cell-interactive' : ''}>
@@ -650,11 +748,16 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, setti
                       <span style={{ fontSize: 14, fontWeight: 700, color: cell.isHoliday ? 'var(--ft-danger)' : 'inherit' }}>
                         {cell.day}
                       </span>
-                      {cell.isActualPayday && (
-                        <span style={{ fontSize: 9, background: '#EAB308', color: '#000', fontWeight: 800, padding: '2px 4px', borderRadius: 4, textTransform: 'uppercase' }}>
-                          💰 Gajian
-                        </span>
-                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end' }}>
+                        {(cell.scheduled || []).slice(0, 2).map((sch, si) => (
+                          <span key={si} className="cal-sch-badge" data-type={sch.type || 'income'}>
+                            {sch.emoji} {sch.label}
+                          </span>
+                        ))}
+                        {(cell.scheduled || []).length > 2 && (
+                          <span style={{ fontSize: 8, color: 'var(--ft-text-3)', fontWeight: 700 }}>+{cell.scheduled.length - 2}</span>
+                        )}
+                      </div>
                     </div>
 
                     {cell.holidayInfo && (
@@ -707,6 +810,268 @@ function Reports({ state, lang, t, chartStyle, onExportExcel, onExportCsv, setti
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </Modal>
+        </div>
+      )}
+
+      {/* Schedule tab */}
+      {tab === 'schedule' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ fontFamily: 'var(--ft-font-display)', fontSize: 20, fontWeight: 700, margin: 0 }}>
+                {lang === 'id' ? 'Jadwal Transaksi' : 'Scheduled Transactions'}
+              </h3>
+              <div style={{ fontSize: 13, color: 'var(--ft-text-3)', marginTop: 4, fontWeight: 600 }}>
+                {lang === 'id' ? 'Kelola gajian, tagihan, dan pemasukan/pengeluaran berulang' : 'Manage payday, bills, and recurring income/expenses'}
+              </div>
+            </div>
+            <button className="ft-btn" data-variant="primary" onClick={openSchAdd}>
+              <Icon name="plus" size={16} strokeWidth={2.5} />
+              {lang === 'id' ? 'Tambah Jadwal' : 'Add Schedule'}
+            </button>
+          </div>
+
+          {scheduledTx.length === 0 ? (
+            <div className="sch-empty">
+              <div className="sch-empty-icon">📅</div>
+              <div className="sch-empty-title">{lang === 'id' ? 'Belum ada jadwal transaksi' : 'No scheduled transactions yet'}</div>
+              <div className="sch-empty-hint">{lang === 'id' ? 'Tambah jadwal gajian, tagihan, atau pemasukan berulang lainnya' : 'Add a payday, bill, or other recurring income schedule'}</div>
+              <button className="ft-btn" data-variant="primary" style={{ marginTop: 16 }} onClick={openSchAdd}>
+                <Icon name="plus" size={16} strokeWidth={2.5} />
+                {lang === 'id' ? 'Tambah Jadwal Pertama' : 'Add First Schedule'}
+              </button>
+            </div>
+          ) : (
+            <div className="sch-list">
+              {scheduledTx.map((sch) => {
+                const acc = state.accounts.find(a => a.id === sch.account);
+                return (
+                  <div key={sch.id} className="sch-item" onClick={() => openSchEdit(sch)}>
+                    <div className="sch-emoji">{sch.emoji || '📅'}</div>
+                    <div className="sch-info">
+                      <div className="sch-info-name">{sch.label}</div>
+                      <div className="sch-info-sub">
+                        {describeRec(sch)} · {acc?.name || '—'}
+                      </div>
+                      <div className="sch-info-next">
+                        <Icon name="calendar" size={10} />
+                        {lang === 'id' ? 'Mulai: ' : 'Start: '}
+                        {sch.startDate ? new Date(sch.startDate + 'T00:00:00').toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                      </div>
+                    </div>
+                    <div className="sch-amount" style={{ color: sch.type === 'income' ? 'var(--ft-success)' : 'var(--ft-danger)' }}>
+                      {sch.amount > 0 ? ((sch.type === 'income' ? '+' : '−') + formatIDR(sch.amount, { compact: true })) : (lang === 'id' ? 'Isi nanti' : 'Fill later')}
+                    </div>
+                    <div className="sch-actions" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => openSchEdit(sch)} title={lang === 'id' ? 'Edit' : 'Edit'}>
+                        <Icon name="settings" size={14} />
+                      </button>
+                      <button onClick={() => setSchDelTarget(sch)} title={lang === 'id' ? 'Hapus' : 'Delete'}>
+                        <Icon name="trash" size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Add/Edit Schedule Modal */}
+          <Modal open={schModalOpen} onClose={() => setSchModalOpen(false)}
+                 title={schEditing ? (lang === 'id' ? 'Edit Jadwal' : 'Edit Schedule') : (lang === 'id' ? 'Tambah Jadwal' : 'Add Schedule')}
+                 sub={lang === 'id' ? 'Atur transaksi berulang otomatis' : 'Set up automatic recurring transactions'}
+                 size="md"
+                 footer={
+                   <>
+                     <button className="ft-btn" data-variant="ghost" onClick={() => setSchModalOpen(false)}>{t('common.cancel')}</button>
+                     <button className="ft-btn" data-variant="primary" onClick={saveSch}>
+                       <Icon name="check" size={16} strokeWidth={2.5} />
+                       {lang === 'id' ? 'Simpan Jadwal' : 'Save Schedule'}
+                     </button>
+                   </>
+                 }>
+            <div className="sch-form">
+              {/* Emoji picker */}
+              <div>
+                <label className="ft-label">{lang === 'id' ? 'Ikon' : 'Icon'}</label>
+                <div className="sch-emoji-picker">
+                  {SCHEDULE_EMOJIS.map((e) => (
+                    <button key={e} type="button" className="sch-emoji-btn" data-active={schForm.emoji === e}
+                            onClick={() => setSchForm(f => ({ ...f, emoji: e }))}>
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Name */}
+              <div>
+                <label className="ft-label">{lang === 'id' ? 'Nama Jadwal' : 'Schedule Name'}</label>
+                <input className="ft-input" placeholder={lang === 'id' ? 'cth: Gaji Bulanan, Listrik...' : 'e.g. Monthly Salary, Electricity...'}
+                       value={schForm.label} onChange={(e) => setSchForm(f => ({ ...f, label: e.target.value }))} />
+              </div>
+
+              {/* Type */}
+              <div>
+                <label className="ft-label">{lang === 'id' ? 'Tipe' : 'Type'}</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className="tx-chip" data-active={schForm.type === 'income'}
+                          onClick={() => setSchForm(f => ({ ...f, type: 'income', category: 'income' }))}>
+                    {t('transactions.typeIncome')}
+                  </button>
+                  <button type="button" className="tx-chip" data-active={schForm.type === 'expense'}
+                          onClick={() => setSchForm(f => ({ ...f, type: 'expense', category: 'food' }))}>
+                    {t('transactions.typeExpense')}
+                  </button>
+                </div>
+              </div>
+
+              {/* Amount + Category row */}
+              <div className="sch-form-row">
+                <div>
+                  <label className="ft-label">{lang === 'id' ? 'Nominal (opsional)' : 'Amount (optional)'}</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ft-text-3)' }}>Rp</span>
+                    <input className="ft-input" inputMode="numeric" placeholder="0"
+                           value={schForm.amount ? Number(String(schForm.amount).replace(/\D/g, '')).toLocaleString('id-ID') : ''}
+                           onChange={(e) => setSchForm(f => ({ ...f, amount: e.target.value.replace(/\D/g, '') }))} />
+                  </div>
+                </div>
+                <div>
+                  <label className="ft-label">{t('transactions.category')}</label>
+                  <select className="ft-input" value={schForm.category}
+                          onChange={(e) => setSchForm(f => ({ ...f, category: e.target.value }))}>
+                    {categories.filter(c => schForm.type === 'income' ? c.id === 'income' : (c.id !== 'income' && c.id !== 'transfer')).map((c) => (
+                      <option key={c.id} value={c.id}>{lang === 'id' ? c.label : c.labelEn}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Account + Start Date row */}
+              <div className="sch-form-row">
+                <div>
+                  <label className="ft-label">{t('transactions.account')}</label>
+                  <select className="ft-input" value={schForm.account}
+                          onChange={(e) => setSchForm(f => ({ ...f, account: e.target.value }))}>
+                    {state.accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="ft-label">{lang === 'id' ? 'Mulai dari tanggal' : 'Starting from'}</label>
+                  <input type="date" className="ft-input" value={schForm.startDate}
+                         onChange={(e) => setSchForm(f => ({ ...f, startDate: e.target.value }))} />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="ft-label">{t('transactions.description')}</label>
+                <input className="ft-input" placeholder={lang === 'id' ? 'Deskripsi transaksi...' : 'Transaction description...'}
+                       value={schForm.description} onChange={(e) => setSchForm(f => ({ ...f, description: e.target.value }))} />
+              </div>
+
+              {/* Recurrence */}
+              <div>
+                <label className="ft-label">{t('transactions.recurring')}</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {[
+                    ['none', lang === 'id' ? 'Tidak berulang' : 'One-time'],
+                    ['daily', lang === 'id' ? 'Harian' : 'Daily'],
+                    ['weekly', lang === 'id' ? 'Mingguan' : 'Weekly'],
+                    ['monthly', lang === 'id' ? 'Bulanan' : 'Monthly'],
+                    ['yearly', lang === 'id' ? 'Tahunan' : 'Yearly'],
+                    ['custom', 'Custom'],
+                  ].map(([id, lbl]) => (
+                    <button key={id} type="button" className="tx-chip" data-active={schForm.recType === id}
+                            onClick={() => setSchForm(f => ({ ...f, recType: id, recUnit: id === 'custom' ? 'months' : id }))}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+
+                {schForm.recType === 'custom' && (
+                  <div className="sch-recurrence-row">
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{lang === 'id' ? 'Setiap' : 'Every'}</span>
+                    <input type="number" min="1" className="ft-input" value={schForm.recInterval}
+                           onChange={(e) => setSchForm(f => ({ ...f, recInterval: Math.max(1, Number(e.target.value) || 1) }))} />
+                    <select className="ft-input" style={{ width: 'auto' }} value={schForm.recUnit}
+                            onChange={(e) => setSchForm(f => ({ ...f, recUnit: e.target.value }))}>
+                      <option value="days">{lang === 'id' ? 'hari' : 'day(s)'}</option>
+                      <option value="weeks">{lang === 'id' ? 'minggu' : 'week(s)'}</option>
+                      <option value="months">{lang === 'id' ? 'bulan' : 'month(s)'}</option>
+                      <option value="years">{lang === 'id' ? 'tahun' : 'year(s)'}</option>
+                    </select>
+                  </div>
+                )}
+
+                {(schForm.recType === 'monthly' || (schForm.recType === 'custom' && schForm.recUnit === 'months')) && (
+                  <div className="sch-recurrence-row" style={{ marginTop: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{lang === 'id' ? 'Pada tanggal' : 'On day'}</span>
+                    <input type="number" min="1" max="31" className="ft-input" value={schForm.recDayOfMonth}
+                           onChange={(e) => setSchForm(f => ({ ...f, recDayOfMonth: Math.max(1, Math.min(31, Number(e.target.value) || 1)) }))} />
+                  </div>
+                )}
+              </div>
+
+              {/* Holiday shift */}
+              {schForm.recType !== 'none' && (
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={schForm.respectHolidays}
+                           onChange={(e) => setSchForm(f => ({ ...f, respectHolidays: e.target.checked }))} />
+                    {lang === 'id' ? 'Geser jika jatuh di hari libur' : 'Shift if falls on holiday'}
+                  </label>
+                  {schForm.respectHolidays && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <button type="button" className="tx-chip" data-active={schForm.holidayException === 'before'}
+                              onClick={() => setSchForm(f => ({ ...f, holidayException: 'before' }))}>
+                        {lang === 'id' ? 'Sebelum libur' : 'Before holiday'}
+                      </button>
+                      <button type="button" className="tx-chip" data-active={schForm.holidayException === 'after'}
+                              onClick={() => setSchForm(f => ({ ...f, holidayException: 'after' }))}>
+                        {lang === 'id' ? 'Setelah libur' : 'After holiday'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* End date */}
+              <div>
+                <label className="ft-label">{lang === 'id' ? 'Sampai (opsional)' : 'Until (optional)'}</label>
+                <input type="date" className="ft-input" value={schForm.endDate}
+                       onChange={(e) => setSchForm(f => ({ ...f, endDate: e.target.value }))}
+                       placeholder={lang === 'id' ? 'Selamanya' : 'Forever'} />
+                <div style={{ fontSize: 11, color: 'var(--ft-text-3)', marginTop: 4, fontWeight: 600 }}>
+                  {!schForm.endDate ? (lang === 'id' ? 'Kosongkan untuk selamanya' : 'Leave empty for forever') : ''}
+                </div>
+              </div>
+            </div>
+          </Modal>
+
+          {/* Delete confirmation modal */}
+          <Modal open={!!schDelTarget} onClose={() => setSchDelTarget(null)}
+                 title={lang === 'id' ? 'Hapus Jadwal?' : 'Delete Schedule?'}
+                 sub={lang === 'id' ? 'Jadwal yang dihapus tidak bisa dikembalikan' : 'Deleted schedules cannot be recovered'}
+                 footer={
+                   <>
+                     <button className="ft-btn" data-variant="ghost" onClick={() => setSchDelTarget(null)}>{t('common.cancel')}</button>
+                     <button className="ft-btn" data-variant="primary" style={{ background: 'var(--ft-danger)' }} onClick={deleteSch}>
+                       {lang === 'id' ? 'Hapus' : 'Delete'}
+                     </button>
+                   </>
+                 }>
+            {schDelTarget && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, background: 'var(--ft-bg)', borderRadius: 12 }}>
+                <div className="sch-emoji">{schDelTarget.emoji || '📅'}</div>
+                <div>
+                  <div style={{ fontWeight: 700 }}>{schDelTarget.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--ft-text-3)' }}>{describeRec(schDelTarget)}</div>
+                </div>
               </div>
             )}
           </Modal>

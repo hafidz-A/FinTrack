@@ -132,6 +132,18 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
           };
           return { ...state, goals, accounts, transactions: [tx, ...state.transactions] };
         }
+        case 'ADD_SCHEDULED':
+          return { ...state, scheduledTx: [...(state.scheduledTx || []), action.scheduled] };
+        case 'EDIT_SCHEDULED':
+          return { ...state, scheduledTx: (state.scheduledTx || []).map((s) => s.id === action.id ? { ...s, ...action.updates } : s) };
+        case 'DEL_SCHEDULED':
+          return { ...state, scheduledTx: (state.scheduledTx || []).filter((s) => s.id !== action.id) };
+        case 'DISMISS_SCHEDULE': {
+          const key = action.scheduleId + '_' + action.date;
+          const prev = state.dismissedSchedules || [];
+          if (prev.includes(key)) return state;
+          return { ...state, dismissedSchedules: [...prev, key] };
+        }
         default:
           return state;
       }
@@ -154,6 +166,8 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
         budgets: [],
         upcoming: [],
         goals: [],
+        scheduledTx: [],
+        dismissedSchedules: [],
       };
     }
 
@@ -391,12 +405,98 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       // QuickAdd modal
       const [qaOpen, setQaOpen] = useState(false);
       const [qaInitialType, setQaInitialType] = useState('expense');
+      const [qaPrefill, setQaPrefill] = useState(null);
 
-      const openAdd = (type) => { setQaInitialType(type); setQaOpen(true); };
+      const openAdd = (type) => { setQaPrefill(null); setQaInitialType(type); setQaOpen(true); };
       const onSave = (tx) => {
         dispatch({ type: 'ADD_TX', tx });
         ToastBus.push(t('transactions.txAdded'));
+        // If this was from a schedule, dismiss it
+        if (qaPrefill && qaPrefill._scheduleId) {
+          const today = new Date().toISOString().slice(0, 10);
+          dispatch({ type: 'DISMISS_SCHEDULE', scheduleId: qaPrefill._scheduleId, date: today });
+          setQaPrefill(null);
+          // show next pending if any
+          setTimeout(() => checkPendingSchedules(), 300);
+        }
       };
+
+      // ── Scheduled transaction popup logic ──
+      const getNextOccurrence = useCallback((sch, refDate) => {
+        const start = new Date(sch.startDate + 'T00:00:00');
+        const ref = refDate || new Date();
+        ref.setHours(0,0,0,0);
+        if (sch.endDate && new Date(sch.endDate) < ref) return null;
+        const rec = sch.recurrence;
+        if (!rec || rec.type === 'none') {
+          return start >= ref ? start : (start.toDateString() === ref.toDateString() ? start : null);
+        }
+        let candidate = new Date(start);
+        const interval = rec.interval || 1;
+        let loops = 0;
+        while (candidate < ref && loops < 3650) {
+          if (rec.type === 'daily' || (rec.type === 'custom' && (rec.unit || 'days') === 'days')) {
+            candidate.setDate(candidate.getDate() + interval);
+          } else if (rec.type === 'weekly' || (rec.type === 'custom' && rec.unit === 'weeks')) {
+            candidate.setDate(candidate.getDate() + 7 * interval);
+          } else if (rec.type === 'monthly' || (rec.type === 'custom' && rec.unit === 'months')) {
+            candidate.setMonth(candidate.getMonth() + interval);
+            if (rec.dayOfMonth) candidate.setDate(Math.min(rec.dayOfMonth, new Date(candidate.getFullYear(), candidate.getMonth() + 1, 0).getDate()));
+          } else if (rec.type === 'yearly' || (rec.type === 'custom' && rec.unit === 'years')) {
+            candidate.setFullYear(candidate.getFullYear() + interval);
+          }
+          loops++;
+        }
+        if (sch.endDate && candidate > new Date(sch.endDate)) return null;
+        return candidate;
+      }, []);
+
+      const checkPendingSchedules = useCallback(() => {
+        const scheduled = state.scheduledTx || [];
+        const dismissed = state.dismissedSchedules || [];
+        const today = new Date(); today.setHours(0,0,0,0);
+        const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
+        const pending = [];
+        scheduled.forEach((sch) => {
+          // Check dates in the last 7 days up to today
+          for (let d = new Date(weekAgo); d <= today; d.setDate(d.getDate() + 1)) {
+            const dateStr = d.toISOString().slice(0, 10);
+            const key = sch.id + '_' + dateStr;
+            if (dismissed.includes(key)) continue;
+            const next = getNextOccurrence(sch, new Date(d));
+            if (next && next.toDateString() === d.toDateString()) {
+              pending.push({ ...sch, _dueDate: dateStr });
+            }
+          }
+        });
+        if (pending.length > 0) {
+          const first = pending[0];
+          setQaPrefill({
+            _scheduleId: first.id,
+            _scheduleName: first.label,
+            _scheduleEmoji: first.emoji,
+            _dueDate: first._dueDate,
+            type: first.type || 'income',
+            amount: first.amount || 0,
+            category: first.category || 'income',
+            account: first.account || (state.accounts[0]?.id),
+            description: first.description || first.label,
+            date: first._dueDate,
+          });
+          setQaInitialType(first.type || 'income');
+          setQaOpen(true);
+        }
+      }, [state.scheduledTx, state.dismissedSchedules, state.accounts, getNextOccurrence]);
+
+      // Check on dashboard mount
+      const scheduleCheckedRef = useRef(false);
+      useEffect(() => {
+        if (route === 'dashboard' && !scheduleCheckedRef.current && (state.scheduledTx || []).length > 0) {
+          scheduleCheckedRef.current = true;
+          setTimeout(() => checkPendingSchedules(), 800);
+        }
+        if (route !== 'dashboard') scheduleCheckedRef.current = false;
+      }, [route, checkPendingSchedules, state.scheduledTx]);
 
       const onExportExcel = async (fileName) => {
         try {
@@ -602,11 +702,12 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
                   <Goals state={state} dispatch={dispatch} lang={lang} t={t} />
                 )}
                 {route === 'reports' && (
-                  <Reports state={state} lang={lang} t={t} chartStyle={tw.chartStyle}
+                  <Reports state={state} dispatch={dispatch} lang={lang} t={t} chartStyle={tw.chartStyle}
                            onExportExcel={onExportExcel}
                            onExportCsv={onExportCsv}
                            settings={settings}
-                           onUpdateSetting={handleUpdateSetting} />
+                           onUpdateSetting={handleUpdateSetting}
+                           getNextOccurrence={getNextOccurrence} />
                 )}
                 {route === 'settings' && (
                   <Settings lang={lang} t={t}
@@ -631,11 +732,18 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
           <MobileNav route={route} setRoute={setRoute} t={t}
                      onQuickAdd={() => openAdd('expense')} />
 
-          <QuickAddTx open={qaOpen} onClose={() => setQaOpen(false)}
+          <QuickAddTx open={qaOpen} onClose={() => { setQaOpen(false); setQaPrefill(null); }}
                       onSave={onSave} initialType={qaInitialType}
                       lang={lang} t={t}
                       accounts={state.accounts} categories={state.categories}
-                      dispatch={dispatch} />
+                      dispatch={dispatch}
+                      prefill={qaPrefill}
+                      onDismiss={qaPrefill ? () => {
+                        const today = new Date().toISOString().slice(0, 10);
+                        dispatch({ type: 'DISMISS_SCHEDULE', scheduleId: qaPrefill._scheduleId, date: today });
+                        setQaPrefill(null); setQaOpen(false);
+                        setTimeout(() => checkPendingSchedules(), 300);
+                      } : null} />
 
           <FinTrackTweaks tw={tw} setTw={setTw} lang={lang} />
           <ToastHost />
