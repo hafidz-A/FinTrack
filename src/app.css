@@ -79,6 +79,8 @@
   position: relative;
   transition: background .15s, color .15s;
   white-space: nowrap;
+  background: transparent;
+  border: 0;
 }
 .ft-sb-item:hover { background: var(--ft-bg); color: var(--ft-text); }
 .ft-sb-item[data-active="true"] {
