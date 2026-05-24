@@ -1,0 +1,22 @@
+{
+  "name": "moneyflow-dashboard-deploy",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
+    "@vitejs/plugin-react": "^5.0.0",
+    "exceljs": "^4.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^6.3.5"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}
