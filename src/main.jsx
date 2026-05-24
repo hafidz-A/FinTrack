@@ -596,7 +596,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
               <h1 className="ob-left-headline">{title}</h1>
               <p className="ob-left-sub">{note}</p>
             </div>
-            <div style={{ background: 'rgba(255,255,255,.10)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 18, padding: 18, position: 'relative', marginTop: 32 }}>
+            <div className="ob-left-card">
               <div style={{ fontSize: 12, opacity: .8 }}>Total Saldo · Mock</div>
               <div style={{ fontFamily: 'var(--ft-font-display)', fontSize: 32, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 4 }}>Rp 70.685.000</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
@@ -842,114 +842,127 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
         }
       };
 
-      return (
-        <div className="ob-wrap">
-          <div className="ob-card ft-pop" style={{ maxWidth: 520 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-              <Logo size={38} />
-              <span className="ft-pill" data-tone="info">{lang === 'id' ? 'Private Vault' : 'Private Vault'}</span>
-            </div>
+      const leftEyebrow = lang === 'id' ? 'Private Vault' : 'Private Vault';
+      const leftTitleText = recoveryCode
+        ? (lang === 'id' ? 'Vault Berhasil Dibuat' : 'Vault Created Successfully')
+        : mode === 'create'
+          ? (lang === 'id' ? 'Buat vault data' : 'Create data vault')
+          : mode === 'recover'
+            ? (lang === 'id' ? 'Pulihkan vault' : 'Recover vault')
+            : (lang === 'id' ? 'Buka vault data' : 'Unlock data vault');
+      const leftNoteText = recoveryCode
+        ? (lang === 'id' ? 'Simpan recovery code ini dengan aman. Code ini digunakan jika Anda lupa password vault.' : 'Save this recovery code safely. This code is used if you forget your vault password.')
+        : (lang === 'id'
+          ? 'Password akun hanya untuk login. Password vault ini mengunci isi transaksi, akun, budget, dan goals.'
+          : 'Your account password signs you in. This vault password locks transactions, accounts, budgets, and goals.');
 
-            <div style={{ marginTop: 28 }}>
-              <h1 style={{ fontFamily: 'var(--ft-font-display)', fontSize: 30, lineHeight: 1.05, letterSpacing: '-0.03em', margin: 0 }}>
+      return (
+        <div className="ob-shell">
+          <AuthLeftPanel eyebrow={leftEyebrow} title={leftTitleText} note={leftNoteText} />
+          <div className="ob-right">
+            <div className="ob-form">
+              {mode === 'recover' && !recoveryCode && (
+                <button className="ft-link" type="button" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 20 }}
+                        onClick={() => { setError(''); setMode('unlock'); }}>
+                  <Icon name="arrowRight" size={14} style={{ transform: 'rotate(180deg)' }} />
+                  {lang === 'id' ? 'Kembali ke vault password' : 'Back to vault password'}
+                </button>
+              )}
+
+              <h2 className="ob-form-title">
                 {mode === 'create'
                   ? (lang === 'id' ? 'Buat vault data' : 'Create data vault')
                   : mode === 'recover'
                     ? (lang === 'id' ? 'Pulihkan vault' : 'Recover vault')
                     : (lang === 'id' ? 'Buka vault data' : 'Unlock data vault')}
-              </h1>
-              <p style={{ marginTop: 10, marginBottom: 0, color: 'var(--ft-text-2)', lineHeight: 1.55, fontSize: 14 }}>
+              </h2>
+              <p className="ob-form-sub">
                 {lang === 'id'
                   ? 'Password akun hanya untuk login. Password vault ini mengunci isi transaksi, akun, budget, dan goals.'
                   : 'Your account password signs you in. This vault password locks transactions, accounts, budgets, and goals.'}
               </p>
-            </div>
 
-            {recoveryCode ? (
-              <div style={{ marginTop: 22, padding: 16, borderRadius: 14, background: 'var(--ft-success-soft)', border: '1px solid rgba(5, 150, 105, .18)' }}>
-                <div style={{ color: 'var(--ft-success)', fontWeight: 800, fontSize: 13 }}>
-                  {lang === 'id' ? 'Simpan recovery code ini sekarang' : 'Save this recovery code now'}
-                </div>
-                <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: 'var(--ft-card)', fontFamily: 'var(--ft-font-mono)', fontSize: 14, fontWeight: 700, letterSpacing: 0, wordBreak: 'break-word' }}>
-                  {recoveryCode}
-                </div>
-                <div style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button className="ft-btn" data-variant="ghost" data-size="sm" onClick={copyRecovery}>
-                    <Icon name="copy" size={14} strokeWidth={2.5} />
-                    {lang === 'id' ? 'Salin' : 'Copy'}
+              {recoveryCode ? (
+                <div style={{ marginTop: 22, padding: 16, borderRadius: 14, background: 'var(--ft-success-soft)', border: '1px solid rgba(5, 150, 105, .18)' }}>
+                  <div style={{ color: 'var(--ft-success)', fontWeight: 800, fontSize: 13 }}>
+                    {lang === 'id' ? 'Simpan recovery code ini sekarang' : 'Save this recovery code now'}
+                  </div>
+                  <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: 'var(--ft-card)', fontFamily: 'var(--ft-font-mono)', fontSize: 14, fontWeight: 700, letterSpacing: 0, wordBreak: 'break-word' }}>
+                    {recoveryCode}
+                  </div>
+                  <div style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button className="ft-btn" data-variant="ghost" data-size="sm" onClick={copyRecovery}>
+                      <Icon name="copy" size={14} strokeWidth={2.5} />
+                      {lang === 'id' ? 'Salin' : 'Copy'}
+                    </button>
+                    <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: 'var(--ft-text-2)', fontWeight: 700 }}>
+                      <input type="checkbox" checked={savedRecovery} onChange={(e) => setSavedRecovery(e.target.checked)} />
+                      {lang === 'id' ? 'Sudah saya simpan' : 'I saved it'}
+                    </label>
+                  </div>
+                  <button className="ft-btn" data-variant="primary" data-size="lg" style={{ width: '100%', marginTop: 14 }}
+                          disabled={!savedRecovery}
+                          onClick={onContinue}>
+                    {lang === 'id' ? 'Lanjut ke dashboard' : 'Continue to dashboard'}
                   </button>
-                  <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: 'var(--ft-text-2)', fontWeight: 700 }}>
-                    <input type="checkbox" checked={savedRecovery} onChange={(e) => setSavedRecovery(e.target.checked)} />
-                    {lang === 'id' ? 'Sudah saya simpan' : 'I saved it'}
-                  </label>
                 </div>
-                <button className="ft-btn" data-variant="primary" data-size="lg" style={{ width: '100%', marginTop: 14 }}
-                        disabled={!savedRecovery}
-                        onClick={onContinue}>
-                  {lang === 'id' ? 'Lanjut ke dashboard' : 'Continue to dashboard'}
-                </button>
-              </div>
-            ) : (
-              <>
-                {mode !== 'recover' && (
-                  <>
-                    <div className="ob-field-group" style={{ marginTop: 24 }}>
-                      <label className="ft-label">{lang === 'id' ? 'Password vault' : 'Vault password'}</label>
-                      <input className="ft-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 8 karakter" autoFocus />
-                    </div>
-                    {mode === 'create' && (
-                      <div className="ob-field-group">
-                        <label className="ft-label">{lang === 'id' ? 'Konfirmasi password vault' : 'Confirm vault password'}</label>
-                        <input className="ft-input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Minimal 8 karakter" />
+              ) : (
+                <>
+                  {mode !== 'recover' && (
+                    <>
+                      <div className="ob-field-group" style={{ marginTop: 24 }}>
+                        <label className="ft-label">{lang === 'id' ? 'Password vault' : 'Vault password'}</label>
+                        <input className="ft-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 8 karakter" autoFocus />
                       </div>
-                    )}
-                  </>
-                )}
-
-                {mode === 'recover' && (
-                  <>
-                    <div className="ob-field-group" style={{ marginTop: 24 }}>
-                      <label className="ft-label">Recovery code</label>
-                      <input className="ft-input" value={recoveryInput} onChange={(e) => setRecoveryInput(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" autoFocus />
-                    </div>
-                    <div className="ob-field-group">
-                      <label className="ft-label">{lang === 'id' ? 'Password vault baru' : 'New vault password'}</label>
-                      <input className="ft-input" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Minimal 8 karakter" />
-                    </div>
-                  </>
-                )}
-
-                {error && <div style={{ marginTop: 14, padding: 12, borderRadius: 12, background: 'var(--ft-danger-soft)', color: 'var(--ft-danger)', fontSize: 13, fontWeight: 600 }}>{error}</div>}
-
-                <button className="ft-btn" data-variant="primary" data-size="lg" style={{ width: '100%', marginTop: 20 }}
-                        disabled={busy}
-                        onClick={submit}>
-                  {busy
-                    ? (lang === 'id' ? 'Memproses...' : 'Working...')
-                    : mode === 'create'
-                      ? (lang === 'id' ? 'Buat vault' : 'Create vault')
-                      : mode === 'recover'
-                        ? (lang === 'id' ? 'Pulihkan vault' : 'Recover vault')
-                        : (lang === 'id' ? 'Buka vault' : 'Unlock vault')}
-                </button>
-
-                <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                  {status !== 'new' && mode !== 'recover' && (
-                    <button className="ft-link" style={{ fontSize: 13 }} onClick={() => { setError(''); setMode('recover'); }}>
-                      {lang === 'id' ? 'Pakai recovery code' : 'Use recovery code'}
-                    </button>
+                      {mode === 'create' && (
+                        <div className="ob-field-group">
+                          <label className="ft-label">{lang === 'id' ? 'Konfirmasi password vault' : 'Confirm vault password'}</label>
+                          <input className="ft-input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Minimal 8 karakter" />
+                        </div>
+                      )}
+                    </>
                   )}
+
                   {mode === 'recover' && (
-                    <button className="ft-link" style={{ fontSize: 13 }} onClick={() => { setError(''); setMode('unlock'); }}>
-                      {lang === 'id' ? 'Kembali ke vault password' : 'Back to vault password'}
-                    </button>
+                    <>
+                      <div className="ob-field-group" style={{ marginTop: 24 }}>
+                        <label className="ft-label">Recovery code</label>
+                        <input className="ft-input" value={recoveryInput} onChange={(e) => setRecoveryInput(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" autoFocus />
+                      </div>
+                      <div className="ob-field-group">
+                        <label className="ft-label">{lang === 'id' ? 'Password vault baru' : 'New vault password'}</label>
+                        <input className="ft-input" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Minimal 8 karakter" />
+                      </div>
+                    </>
                   )}
-                  <button className="ft-link" style={{ fontSize: 13, marginLeft: 'auto' }} onClick={onLogout}>
-                    {lang === 'id' ? 'Keluar akun' : 'Sign out'}
+
+                  {error && <div style={{ marginTop: 14, padding: 12, borderRadius: 12, background: 'var(--ft-danger-soft)', color: 'var(--ft-danger)', fontSize: 13, fontWeight: 600 }}>{error}</div>}
+
+                  <button className="ft-btn" data-variant="primary" data-size="lg" style={{ width: '100%', marginTop: 20 }}
+                          disabled={busy}
+                          onClick={submit}>
+                    {busy
+                      ? (lang === 'id' ? 'Memproses...' : 'Working...')
+                      : mode === 'create'
+                        ? (lang === 'id' ? 'Buat vault' : 'Create vault')
+                        : mode === 'recover'
+                          ? (lang === 'id' ? 'Pulihkan vault' : 'Recover vault')
+                          : (lang === 'id' ? 'Buka vault' : 'Unlock vault')}
                   </button>
-                </div>
-              </>
-            )}
+
+                  <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                    {status !== 'new' && mode !== 'recover' && (
+                      <button className="ft-link" style={{ fontSize: 13 }} onClick={() => { setError(''); setMode('recover'); }}>
+                        {lang === 'id' ? 'Pakai recovery code' : 'Use recovery code'}
+                      </button>
+                    )}
+                    <button className="ft-link" style={{ fontSize: 13, marginLeft: 'auto' }} onClick={onLogout}>
+                      {lang === 'id' ? 'Keluar akun' : 'Sign out'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       );

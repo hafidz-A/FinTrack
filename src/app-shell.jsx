@@ -369,12 +369,7 @@ function Onboarding({ onDone, lang, t, initialMode = 'signin' }) {
             </div>
 
             {/* Decorative preview card */}
-            <div style={{
-              background: 'rgba(255,255,255,.10)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255,255,255,.18)',
-              borderRadius: 18, padding: 18, position: 'relative', marginTop: 32,
-            }}>
+            <div className="ob-left-card">
               <div style={{ fontSize: 12, opacity: .8 }}>Total Saldo · Mock</div>
               <div style={{ fontFamily: 'var(--ft-font-display)', fontSize: 32, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 4 }}>
                 Rp 70.685.000
