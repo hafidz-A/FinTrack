@@ -503,14 +503,64 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       );
     }
 
+    function AuthLeftPanel({ eyebrow, title, note }) {
+      return (
+        <div className="ob-left">
+          <div className="ob-left-content">
+            <div className="ob-left-brand"><Logo /></div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div className="ft-pill" style={{ background: 'rgba(255,255,255,.15)', color: 'white', alignSelf: 'flex-start' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#DFFB6E' }} />
+                {eyebrow}
+              </div>
+              <h1 className="ob-left-headline">{title}</h1>
+              <p className="ob-left-sub">{note}</p>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,.10)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 18, padding: 18, position: 'relative', marginTop: 32 }}>
+              <div style={{ fontSize: 12, opacity: .8 }}>Total Saldo - Mock</div>
+              <div style={{ fontFamily: 'var(--ft-font-display)', fontSize: 32, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 4 }}>Rp 70.685.000</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                <span className="ft-pill" style={{ background: 'rgba(223,251,110,.2)', color: '#DFFB6E' }}>+47jt</span>
+                <span className="ft-pill" style={{ background: 'rgba(255,255,255,.12)', color: 'white' }}>-12jt</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function AuthSocialButtons({ lang }) {
+      const disabledNotice = () => ToastBus.push(lang === 'id' ? 'SSO belum diaktifkan' : 'SSO is not enabled yet');
+      return (
+        <div className="ob-sso">
+          <button className="ob-sso-btn" type="button" onClick={disabledNotice}>
+            <span style={{ color: '#4285F4', fontWeight: 800, fontSize: 18 }}>G</span>
+            {lang === 'id' ? 'Lanjut dengan Google' : 'Continue with Google'}
+          </button>
+          <button className="ob-sso-btn" type="button" onClick={disabledNotice}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 20.28c-.98.95-2.05.86-3.08.43-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.43C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" /></svg>
+            {lang === 'id' ? 'Lanjut dengan Apple' : 'Continue with Apple'}
+          </button>
+          <div className="ob-divider">{lang === 'id' ? 'atau' : 'or'}</div>
+        </div>
+      );
+    }
+
     function SupabaseAuth({ lang, mode = 'signin', onDone }) {
       const [authMode, setAuthMode] = useState(mode);
       const [email, setEmail] = useState('');
       const [password, setPassword] = useState('');
       const [confirm, setConfirm] = useState('');
+      const [remember, setRemember] = useState(true);
       const [busy, setBusy] = useState(false);
       const [notice, setNotice] = useState('');
       const [error, setError] = useState('');
+
+      const clearMode = (next) => {
+        setError('');
+        setNotice('');
+        setAuthMode(next);
+      };
 
       const submit = async () => {
         setBusy(true);
@@ -540,9 +590,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
               ToastBus.push(lang === 'id' ? 'Akun dibuat' : 'Account created');
               onDone && onDone(activeSession);
             } else {
-              setNotice(lang === 'id'
-                ? 'Akun dibuat. Cek email untuk token/link konfirmasi Supabase.'
-                : 'Account created. Check your email for the Supabase confirmation token/link.');
+              setNotice(lang === 'id' ? 'Akun dibuat. Cek email untuk token/link konfirmasi Supabase.' : 'Account created. Check your email for the Supabase confirmation token/link.');
             }
             return;
           }
@@ -556,79 +604,107 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
         }
       };
 
+      const title = authMode === 'recovery'
+        ? (lang === 'id' ? 'Buat password baru' : 'Create new password')
+        : authMode === 'reset'
+          ? (lang === 'id' ? 'Reset password' : 'Reset password')
+          : authMode === 'signup'
+            ? (lang === 'id' ? 'Buat akun FinTrack' : 'Create a FinTrack account')
+            : (lang === 'id' ? 'Masuk ke FinTrack' : 'Sign in to FinTrack');
+      const subtitle = authMode === 'recovery'
+        ? (lang === 'id' ? 'Token recovery dari email Supabase sudah aktif.' : 'Your Supabase recovery token is active.')
+        : authMode === 'reset'
+          ? (lang === 'id' ? 'Kami akan mengirim link reset password ke email akunmu.' : 'We will send a password reset link to your account email.')
+          : authMode === 'signup'
+            ? (lang === 'id' ? 'Buat akun dulu, lalu kunci data finansialmu dengan vault pribadi.' : 'Create your account, then lock finance data with a private vault.')
+            : (lang === 'id' ? 'Senang melihatmu kembali.' : 'Good to see you again.');
+      const leftTitle = authMode === 'signup'
+        ? (lang === 'id' ? 'Mulai kelola uangmu dengan rapi' : 'Start managing your money cleanly')
+        : authMode === 'reset' || authMode === 'recovery'
+          ? (lang === 'id' ? 'Akunmu tetap aman' : 'Keep your account safe')
+          : (lang === 'id' ? 'Senang melihatmu kembali' : 'Good to see you again');
+      const leftNote = authMode === 'signup'
+        ? (lang === 'id' ? 'Buat akun publik multi-user, lalu data keuangan tetap dikunci di vault terenkripsi.' : 'Create a public multi-user account while finance data stays locked in an encrypted vault.')
+        : authMode === 'reset' || authMode === 'recovery'
+          ? (lang === 'id' ? 'Reset hanya mengubah password akun. Isi vault tetap perlu password vault atau recovery code.' : 'Reset only changes the account password. Vault data still needs a vault password or recovery code.')
+          : (lang === 'id' ? 'Masuk untuk lihat update keuanganmu hari ini.' : "Sign in to see today's finance updates.");
+
       return (
-        <div className="ob-wrap">
-          <div className="ob-card ft-pop" style={{ maxWidth: 460 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-              <Logo size={38} />
-              <span className="ft-pill" data-tone="info">Supabase</span>
-            </div>
-            <div style={{ marginTop: 28 }}>
-              <h1 style={{ fontFamily: 'var(--ft-font-display)', fontSize: 30, lineHeight: 1.05, letterSpacing: '-0.03em', margin: 0 }}>
-                {authMode === 'recovery'
-                  ? (lang === 'id' ? 'Buat password baru' : 'Create new password')
+        <div className="ob-shell">
+          <AuthLeftPanel eyebrow={title} title={leftTitle} note={leftNote} />
+          <div className="ob-right">
+            <div className="ob-form">
+              <h2 className="ob-form-title">{title}</h2>
+              <p className="ob-form-sub">{subtitle}</p>
+
+              {(authMode === 'signin' || authMode === 'signup') && <AuthSocialButtons lang={lang} />}
+
+              {authMode !== 'recovery' && (
+                <div className="ob-field-group">
+                  <label className="ft-label">Email</label>
+                  <input className="ft-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="andi@studiowiyono.id" autoFocus />
+                </div>
+              )}
+
+              {authMode !== 'reset' && (
+                <div className="ob-field-group">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <label className="ft-label">Password</label>
+                    {authMode === 'signin' && (
+                      <button className="ft-link" style={{ fontSize: 12.5 }} type="button" onClick={() => clearMode('reset')}>
+                        {lang === 'id' ? 'Lupa password?' : 'Forgot password?'}
+                      </button>
+                    )}
+                  </div>
+                  <input className="ft-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="********" />
+                </div>
+              )}
+
+              {(authMode === 'recovery' || authMode === 'signup') && (
+                <div className="ob-field-group">
+                  <label className="ft-label">{lang === 'id' ? 'Konfirmasi password' : 'Confirm password'}</label>
+                  <input className="ft-input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="********" />
+                </div>
+              )}
+
+              {authMode === 'signin' && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: 'var(--ft-text-2)', fontWeight: 600, marginTop: 4, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--ft-action)' }} />
+                  {lang === 'id' ? 'Ingat saya' : 'Remember me'}
+                </label>
+              )}
+
+              {error && <div style={{ marginTop: 14, padding: 12, borderRadius: 12, background: 'var(--ft-danger-soft)', color: 'var(--ft-danger)', fontSize: 13, fontWeight: 600 }}>{error}</div>}
+              {notice && <div style={{ marginTop: 14, padding: 12, borderRadius: 12, background: 'var(--ft-success-soft)', color: 'var(--ft-success)', fontSize: 13, fontWeight: 600 }}>{notice}</div>}
+
+              <button className="ft-btn" data-variant="primary" data-size="lg" style={{ width: '100%', marginTop: 24 }} disabled={busy} onClick={submit}>
+                {busy
+                  ? (lang === 'id' ? 'Memproses...' : 'Working...')
                   : authMode === 'reset'
-                    ? (lang === 'id' ? 'Reset password' : 'Reset password')
+                    ? (lang === 'id' ? 'Kirim link reset' : 'Send reset link')
+                  : authMode === 'recovery'
+                    ? (lang === 'id' ? 'Simpan password baru' : 'Save new password')
                     : authMode === 'signup'
-                      ? (lang === 'id' ? 'Buat akun FinTrack' : 'Create a FinTrack account')
-                      : (lang === 'id' ? 'Masuk ke dashboard pribadi' : 'Sign in to your private dashboard')}
-              </h1>
-              <p style={{ marginTop: 10, marginBottom: 0, color: 'var(--ft-text-2)', lineHeight: 1.55, fontSize: 14 }}>
-                {authMode === 'recovery'
-                  ? (lang === 'id' ? 'Token recovery dari email Supabase sudah aktif.' : 'Your Supabase recovery token is active.')
-                  : authMode === 'signup'
-                    ? (lang === 'id' ? 'Akun memakai Supabase Auth. Data finansial akan dikunci lagi di vault pribadi.' : 'Your account uses Supabase Auth. Finance data is locked again in a private vault.')
-                    : (lang === 'id' ? 'Data tersimpan di Supabase milik akunmu sendiri.' : 'Your data is stored in your own Supabase account.')}
-              </p>
-            </div>
-            {authMode !== 'recovery' && (
-              <div className="ob-field-group" style={{ marginTop: 24 }}>
-                <label className="ft-label">Email</label>
-                <input className="ft-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" autoFocus />
-              </div>
-            )}
-            {authMode !== 'reset' && (
-              <div className="ob-field-group">
-                <label className="ft-label">Password</label>
-                <input className="ft-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-              </div>
-            )}
-            {(authMode === 'recovery' || authMode === 'signup') && (
-              <div className="ob-field-group">
-                <label className="ft-label">{lang === 'id' ? 'Konfirmasi password' : 'Confirm password'}</label>
-                <input className="ft-input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••" />
-              </div>
-            )}
-            {error && <div style={{ marginTop: 14, padding: 12, borderRadius: 12, background: 'var(--ft-danger-soft)', color: 'var(--ft-danger)', fontSize: 13, fontWeight: 600 }}>{error}</div>}
-            {notice && <div style={{ marginTop: 14, padding: 12, borderRadius: 12, background: 'var(--ft-success-soft)', color: 'var(--ft-success)', fontSize: 13, fontWeight: 600 }}>{notice}</div>}
-            <button className="ft-btn" data-variant="primary" data-size="lg" style={{ width: '100%', marginTop: 20 }}
-                    disabled={busy}
-                    onClick={submit}>
-              {busy
-                ? (lang === 'id' ? 'Memproses...' : 'Working...')
-                : authMode === 'reset'
-                  ? (lang === 'id' ? 'Kirim link reset' : 'Send reset link')
-                : authMode === 'recovery'
-                  ? (lang === 'id' ? 'Simpan password baru' : 'Save new password')
-                  : authMode === 'signup'
-                    ? (lang === 'id' ? 'Buat akun' : 'Create account')
-                  : (lang === 'id' ? 'Masuk' : 'Sign in')}
-            </button>
-            {authMode === 'signin' && (
-              <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                <button className="ft-link" style={{ fontSize: 13 }} onClick={() => { setError(''); setNotice(''); setAuthMode('signup'); }}>
-                  {lang === 'id' ? 'Buat akun' : 'Create account'}
-                </button>
-                <button className="ft-link" style={{ fontSize: 13 }} onClick={() => { setError(''); setNotice(''); setAuthMode('reset'); }}>
-                  {lang === 'id' ? 'Lupa password?' : 'Forgot password?'}
-                </button>
-              </div>
-            )}
-            {(authMode === 'reset' || authMode === 'signup') && (
-              <button className="ft-link" style={{ marginTop: 16, fontSize: 13 }} onClick={() => { setError(''); setNotice(''); setAuthMode('signin'); }}>
-                {lang === 'id' ? 'Kembali ke login' : 'Back to sign in'}
+                      ? (lang === 'id' ? 'Buat akun' : 'Create account')
+                    : (lang === 'id' ? 'Masuk ke akunku' : 'Sign in to my account')}
+                {authMode === 'signin' && <Icon name="arrowRight" size={16} />}
               </button>
-            )}
+
+              {authMode === 'signin' && (
+                <div style={{ marginTop: 22, fontSize: 13.5, color: 'var(--ft-text-2)', textAlign: 'center' }}>
+                  {lang === 'id' ? 'Belum punya akun?' : "Don't have an account?"}{' '}
+                  <button className="ft-link" type="button" onClick={() => clearMode('signup')}>
+                    {lang === 'id' ? 'Buat akun' : 'Create account'}
+                  </button>
+                </div>
+              )}
+
+              {(authMode === 'reset' || authMode === 'signup') && (
+                <button className="ft-link" style={{ marginTop: 16, fontSize: 13 }} onClick={() => clearMode('signin')}>
+                  {lang === 'id' ? 'Kembali ke login' : 'Back to sign in'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       );
