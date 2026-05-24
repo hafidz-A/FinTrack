@@ -1,36 +1,85 @@
-﻿// FinTrack â€” Settings page.
-// 6 sections: Profile Â· Account & Security Â· Notifications Â· Display Â· Subscription Â· Data & Privacy.
+// FinTrack Settings page.
+// Profile, account, notifications, display, data, and privacy controls.
 // Preferences persist to localStorage; finance records persist locally and can
 // be imported/exported as a private Excel workbook.
 
-function Settings({ lang, t, state, supabaseMode = false, setLang, tw, setTw, onLogout, onExportExcel, onImportExcel, onResetPrivateData }) {
+function cleanText(value) {
+  return String(value || '')
+    .replace(/\u00C2/g, '')
+    .replace(/\uFFFD/g, '')
+    .trim();
+}
+
+function initialsFromProfile(name, email) {
+  const source = cleanText(name) || cleanText(email).split('@')[0] || 'FinTrack User';
+  return source
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || 'FT';
+}
+
+function defaultSettings(profile = {}) {
+  const email = cleanText(profile.email);
+  const handle = cleanText(profile.handle) || email.split('@')[0] || '';
+  return {
+    name: cleanText(profile.name) || 'FinTrack User',
+    handle,
+    email,
+    phone: cleanText(profile.phone),
+    bio: cleanText(profile.bio),
+    notifBudget: true,
+    notifUpcoming: true,
+    notifDaily: false,
+    notifWeekly: true,
+    notifGoal: true,
+    notifMarketing: false,
+    currency: 'IDR',
+    dateFormat: 'DD/MM/YYYY',
+  };
+}
+
+function loadSettings(settingsKey, profile) {
+  const base = defaultSettings(profile);
+  const keys = [settingsKey || 'ft_settings'];
+  if (keys[0] !== 'ft_settings') keys.push('ft_settings');
+  for (const key of keys) {
+    try {
+      const stored = JSON.parse(localStorage.getItem(key) || 'null');
+      if (!stored) continue;
+      if (key === 'ft_settings' && settingsKey !== 'ft_settings' && cleanText(stored.email) !== base.email) continue;
+      return { ...base, ...stored };
+    } catch (_) {}
+  }
+  return base;
+}
+
+function Settings({ lang, t, state, supabaseMode = false, profile = {}, settingsKey = 'ft_settings', onProfileChange, setLang, tw, setTw, onLogout, onExportExcel, onImportExcel, onResetPrivateData }) {
   const [section, setSection] = useState(() => localStorage.getItem('ft_set_sec') || 'profile');
   useEffect(() => { localStorage.setItem('ft_set_sec', section); }, [section]);
+  useEffect(() => {
+    if (section === 'billing') setSection('profile');
+  }, [section]);
 
-  // Settings state (persisted)
-  const [s, setS] = useState(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('ft_settings') || 'null');
-      if (stored) return stored;
-    } catch (_) {}
-    return {
-      name: 'Andi Wiyono',
-      handle: 'andi.w',
-      email: 'andi@studiowiyono.id',
-      phone: '+62 812 5512 4400',
-      bio: 'Designer freelance Â· Jakarta. Lagi belajar misahin keuangan bisnis dan pribadi.',
-      twoFA: false,
-      notifBudget: true,
-      notifUpcoming: true,
-      notifDaily: false,
-      notifWeekly: true,
-      notifGoal: true,
-      notifMarketing: false,
-      currency: 'IDR',
-      dateFormat: 'DD/MM/YYYY',
+  // Settings state (persisted per signed-in user when Supabase is enabled)
+  const [s, setS] = useState(() => loadSettings(settingsKey, profile));
+  useEffect(() => {
+    setS(loadSettings(settingsKey, profile));
+  }, [settingsKey]);
+  useEffect(() => {
+    localStorage.setItem(settingsKey, JSON.stringify(s));
+    const nextProfile = {
+      name: cleanText(s.name),
+      handle: cleanText(s.handle),
+      email: cleanText(s.email),
+      phone: cleanText(s.phone),
+      bio: cleanText(s.bio),
+      avatar: initialsFromProfile(s.name, s.email),
     };
-  });
-  useEffect(() => { localStorage.setItem('ft_settings', JSON.stringify(s)); }, [s]);
+    onProfileChange && onProfileChange(nextProfile);
+  }, [s, settingsKey]);
 
   const update = (k, v) => {
     setS((prev) => ({ ...prev, [k]: v }));
@@ -46,7 +95,6 @@ function Settings({ lang, t, state, supabaseMode = false, setLang, tw, setTw, on
     { id: 'account',  icon: 'wallet',   label: t('settings.sectionAccount') },
     { id: 'notif',    icon: 'bell',     label: t('settings.sectionNotif') },
     { id: 'display',  icon: 'sun',      label: t('settings.sectionDisplay') },
-    { id: 'billing',  icon: 'star',     label: t('settings.sectionBilling') },
     { id: 'data',     icon: 'download', label: t('settings.sectionData') },
     { id: 'danger',   icon: 'warning',  label: t('settings.sectionDanger'), tone: 'danger' },
   ];
@@ -57,6 +105,10 @@ function Settings({ lang, t, state, supabaseMode = false, setLang, tw, setTw, on
     [lang === 'id' ? 'Anggaran' : 'Budgets', String(state.budgets.length)],
     [lang === 'id' ? 'Tujuan' : 'Goals', String(state.goals.length)],
   ];
+  const profileInitials = initialsFromProfile(s.name, s.email);
+  const profileMeta = [s.handle ? '@' + cleanText(s.handle) : '', cleanText(s.email)]
+    .filter(Boolean)
+    .join(' - ');
 
   return (
     <div className="ft-fade-up">
@@ -83,7 +135,7 @@ function Settings({ lang, t, state, supabaseMode = false, setLang, tw, setTw, on
             ))}
           </div>
           <div style={{ marginTop: 24, padding: '0 14px', fontSize: 11.5, color: 'var(--ft-text-3)', fontWeight: 600 }}>
-            {t('settings.versionLabel')} 1.0.0 Â· {lang === 'id' ? 'Build Mei 2026' : 'Build May 2026'}
+            {t('settings.versionLabel')} 1.0.0 - {lang === 'id' ? 'Build Mei 2026' : 'Build May 2026'}
           </div>
         </aside>
 
@@ -98,10 +150,10 @@ function Settings({ lang, t, state, supabaseMode = false, setLang, tw, setTw, on
               </div>
 
               <div className="set-profile-head">
-                <div className="set-avatar-big">AW</div>
+                <div className="set-avatar-big">{profileInitials}</div>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <div style={{ fontFamily: 'var(--ft-font-display)', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>{s.name}</div>
-                  <div style={{ fontSize: 13.5, color: 'var(--ft-text-2)', marginTop: 2 }}>@{s.handle} Â· {s.email}</div>
+                  <div style={{ fontSize: 13.5, color: 'var(--ft-text-2)', marginTop: 2 }}>{profileMeta}</div>
                   <div style={{ fontSize: 12, color: 'var(--ft-text-3)', marginTop: 6 }}>
                     {t('settings.memberSince')} {lang === 'id' ? 'Maret 2026' : 'March 2026'}
                   </div>
@@ -138,83 +190,35 @@ function Settings({ lang, t, state, supabaseMode = false, setLang, tw, setTw, on
           )}
 
           {section === 'account' && (
-            <>
-              <div className="set-section">
-                <div className="set-section-head">
-                  <div>
-                    <div className="set-section-title">{t('settings.changePassword')}</div>
-                    <div className="set-section-sub">{lang === 'id' ? 'Pastikan password kuat dan unik.' : 'Use a strong, unique password.'}</div>
-                  </div>
-                </div>
-                <div className="set-grid-1">
-                  <div>
-                    <label className="ft-label">{t('settings.currentPassword')}</label>
-                    <input className="ft-input" type="password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
-                  </div>
-                  <div className="set-grid-2">
-                    <div>
-                      <label className="ft-label">{t('settings.newPassword')}</label>
-                      <input className="ft-input" type="password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
-                    </div>
-                    <div>
-                      <label className="ft-label">{t('settings.confirmPassword')}</label>
-                      <input className="ft-input" type="password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button className="ft-btn" data-variant="primary" onClick={() => ToastBus.push(lang === 'id' ? 'Password diperbarui' : 'Password updated')}>
-                      {t('common.save')}
-                    </button>
-                  </div>
+            <div className="set-section">
+              <div className="set-section-head">
+                <div>
+                  <div className="set-section-title">{t('settings.changePassword')}</div>
+                  <div className="set-section-sub">{lang === 'id' ? 'Pastikan password kuat dan unik.' : 'Use a strong, unique password.'}</div>
                 </div>
               </div>
-
-              <div className="set-section">
-                <div className="set-section-head">
-                  <div>
-                    <div className="set-section-title">{t('settings.twoFA')}</div>
-                    <div className="set-section-sub">{t('settings.twoFASub')}</div>
-                  </div>
-                  <Switch on={s.twoFA} onChange={(v) => update('twoFA', v)} />
+              <div className="set-grid-1">
+                <div>
+                  <label className="ft-label">{t('settings.currentPassword')}</label>
+                  <input className="ft-input" type="password" placeholder="********" />
                 </div>
-                {s.twoFA && (
-                  <div style={{ padding: 16, background: 'var(--ft-success-soft)', borderRadius: 12, fontSize: 13, color: 'var(--ft-success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <Icon name="check" size={16} strokeWidth={2.5} />
-                    {lang === 'id' ? '2FA aktif via aplikasi authenticator.' : '2FA active via authenticator app.'}
-                  </div>
-                )}
-              </div>
-
-              <div className="set-section">
-                <div className="set-section-head">
+                <div className="set-grid-2">
                   <div>
-                    <div className="set-section-title">{t('settings.sessions')}</div>
-                    <div className="set-section-sub">{lang === 'id' ? 'Perangkat yang sedang login.' : 'Devices currently signed in.'}</div>
+                    <label className="ft-label">{t('settings.newPassword')}</label>
+                    <input className="ft-input" type="password" placeholder="********" />
                   </div>
-                  <button className="ft-btn" data-variant="ghost" data-size="sm" onClick={onLogout}>
-                    {t('settings.sessionLogoutAll')}
+                  <div>
+                    <label className="ft-label">{t('settings.confirmPassword')}</label>
+                    <input className="ft-input" type="password" placeholder="********" />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button className="ft-btn" data-variant="primary" onClick={() => ToastBus.push(lang === 'id' ? 'Password diperbarui' : 'Password updated')}>
+                    {t('common.save')}
                   </button>
                 </div>
-
-                {[
-                  { icon: 'ðŸ’»', name: 'MacBook Pro Â· Chrome', meta: 'Jakarta, ID Â· ' + (lang === 'id' ? 'Sesi ini' : 'This session'), current: true },
-                  { icon: 'ðŸ“±', name: 'iPhone 15 Â· FinTrack iOS', meta: 'Jakarta, ID Â· ' + (lang === 'id' ? '2 jam lalu' : '2 hours ago') },
-                  { icon: 'ðŸ’»', name: 'Windows PC Â· Edge', meta: 'Bandung, ID Â· ' + (lang === 'id' ? '3 hari lalu' : '3 days ago') },
-                ].map((sess, i) => (
-                  <div key={i} className="set-session">
-                    <div className="set-session-icon">{sess.icon}</div>
-                    <div>
-                      <div className="set-session-name">{sess.name}</div>
-                      <div className="set-session-meta">{sess.meta}</div>
-                    </div>
-                    {sess.current
-                      ? <span className="set-session-badge">{lang === 'id' ? 'Aktif' : 'Active'}</span>
-                      : <button className="ft-link" style={{ fontSize: 13 }}>{t('common.logout')}</button>
-                    }
-                  </div>
-                ))}
               </div>
-            </>
+            </div>
           )}
 
           {section === 'notif' && (
@@ -296,10 +300,10 @@ function Settings({ lang, t, state, supabaseMode = false, setLang, tw, setTw, on
                 </div>
                 <select className="ft-input" style={{ width: 180 }}
                         value={s.currency} onChange={(e) => update('currency', e.target.value)}>
-                  <option value="IDR">IDR Â· Rp</option>
-                  <option value="USD">USD Â· $</option>
-                  <option value="SGD">SGD Â· S$</option>
-                  <option value="EUR">EUR Â· â‚¬</option>
+                  <option value="IDR">IDR - Rp</option>
+                  <option value="USD">USD - $</option>
+                  <option value="SGD">SGD - S$</option>
+                  <option value="EUR">EUR - EUR</option>
                 </select>
               </div>
               <div className="set-row">
@@ -316,55 +320,6 @@ function Settings({ lang, t, state, supabaseMode = false, setLang, tw, setTw, on
                      onChange={(v) => update('dateFormat', v)} />
               </div>
             </div>
-          )}
-
-          {section === 'billing' && (
-            <>
-              <div className="set-plan-card">
-                <div className="set-plan-tag">{t('settings.planCurrent')}</div>
-                <div className="set-plan-name">{t('settings.planFree')}</div>
-                <div className="set-plan-sub">
-                  {lang === 'id' ? '2 akun, 100 transaksi/bulan, riwayat 3 bulan.' : '2 accounts, 100 tx/month, 3 months of history.'}
-                </div>
-                <div className="set-plan-features">
-                  {[
-                    lang === 'id' ? 'Pencatatan manual' : 'Manual entry',
-                    lang === 'id' ? 'Laporan dasar' : 'Basic reports',
-                    lang === 'id' ? 'Notifikasi anggaran' : 'Budget alerts',
-                    lang === 'id' ? '1 mata uang (IDR)' : 'Single currency (IDR)',
-                  ].map((f, i) => (
-                    <div key={i} className="set-plan-feature">
-                      <Icon name="check" size={14} color="#DFFB6E" strokeWidth={2.5} />
-                      <span>{f}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="set-plan-actions">
-                  <button className="ft-btn" data-variant="lime"
-                          onClick={() => ToastBus.push(lang === 'id' ? 'Membuka halaman upgradeâ€¦' : 'Opening upgradeâ€¦')}>
-                    {t('settings.planUpgrade')} Â· Rp 29rb/bulan
-                  </button>
-                </div>
-              </div>
-
-              <div className="set-section">
-                <div className="set-section-head">
-                  <div>
-                    <div className="set-section-title">{t('settings.paymentMethod')}</div>
-                    <div className="set-section-sub">{lang === 'id' ? 'Untuk berlangganan dan pembelian dalam aplikasi.' : 'For subscriptions and in-app purchases.'}</div>
-                  </div>
-                  <button className="ft-btn" data-variant="ghost" data-size="sm"
-                          onClick={() => ToastBus.push(lang === 'id' ? 'Tambah kartu / e-wallet' : 'Add card / e-wallet')}>
-                    <Icon name="plus" size={14} strokeWidth={2.5} />
-                    {t('settings.addPayment')}
-                  </button>
-                </div>
-                <div style={{ padding: 32, textAlign: 'center', color: 'var(--ft-text-3)', fontSize: 13.5 }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>ðŸ’³</div>
-                  {lang === 'id' ? 'Belum ada metode pembayaran tersimpan.' : 'No payment methods saved yet.'}
-                </div>
-              </div>
-            </>
           )}
 
           {section === 'data' && (
@@ -474,7 +429,7 @@ function Settings({ lang, t, state, supabaseMode = false, setLang, tw, setTw, on
              }>
         <div style={{ padding: 16, background: 'var(--ft-danger-soft)', borderRadius: 12, marginBottom: 16 }}>
           <div style={{ fontSize: 13.5, color: 'var(--ft-danger)', fontWeight: 600, lineHeight: 1.5 }}>
-            âš ï¸ {lang === 'id'
+            {lang === 'id'
               ? 'Tindakan ini akan menghapus semua transaksi, akun, anggaran, dan tujuanmu. Tidak bisa dibatalkan.'
               : 'This will wipe every transaction, account, budget, and goal. It cannot be undone.'}
           </div>
@@ -512,7 +467,7 @@ function Settings({ lang, t, state, supabaseMode = false, setLang, tw, setTw, on
   );
 }
 
-// â”€â”€ Tiny stateless components used by Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Tiny stateless components used by Settings.
 function Switch({ on, onChange }) {
   return (
     <button type="button" className="set-switch"

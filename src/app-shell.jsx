@@ -3,7 +3,7 @@
 const { useState: useStateShell, useEffect: useEffectShell, useMemo: useMemoShell } = React;
 
 // ── Sidebar ─────────────────────────────────────────────────────────────────
-function Sidebar({ route, setRoute, lang, t, onQuickAdd, sbMode, setSbMode }) {
+function Sidebar({ route, setRoute, lang, t, onQuickAdd, sbMode, setSbMode, profile }) {
   const items = [
   { id: 'dashboard', icon: 'home', label: t('nav.dashboard') },
   { id: 'transactions', icon: 'list', label: t('nav.transactions') },
@@ -14,6 +14,7 @@ function Sidebar({ route, setRoute, lang, t, onQuickAdd, sbMode, setSbMode }) {
 
   const collapsed = sbMode === 'icon';
   const toggleSb = () => setSbMode && setSbMode(collapsed ? 'full' : 'icon');
+  const activeProfile = profile || window.FT_DATA.user || {};
   return (
     <aside className="ft-sb" data-comment-anchor="c2ebf249e3-aside-17-5">
       <button className="ft-sb-toggle"
@@ -57,17 +58,11 @@ function Sidebar({ route, setRoute, lang, t, onQuickAdd, sbMode, setSbMode }) {
 
       <div className="ft-sb-spacer" data-comment-anchor="57188f4f20-div-46-7" />
 
-      <div className="ft-sb-upgrade">
-        <div className="ft-sb-upgrade-title">{t('sidebar.upgrade')}</div>
-        <div className="ft-sb-upgrade-sub" data-comment-anchor="9b001d0d6b-div-50-9">{t('sidebar.upgradeNote')}</div>
-        <button className="ft-btn" data-variant="lime" data-size="sm">→</button>
-      </div>
-
       <button className="ft-sb-profile" onClick={() => setRoute('settings')}>
-        <div className="ft-avatar">{window.FT_DATA.user.avatar}</div>
+        <div className="ft-avatar">{activeProfile.avatar || 'FT'}</div>
         <div className="ft-sb-profile-text">
-          <div className="ft-sb-profile-name">{window.FT_DATA.user.name}</div>
-          <div className="ft-sb-profile-mail" data-comment-anchor="f697ac8b52-div-58-11">{window.FT_DATA.user.email}</div>
+          <div className="ft-sb-profile-name">{activeProfile.name || 'FinTrack User'}</div>
+          <div className="ft-sb-profile-mail" data-comment-anchor="f697ac8b52-div-58-11">{activeProfile.email || ''}</div>
         </div>
       </button>
     </aside>);

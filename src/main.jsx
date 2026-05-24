@@ -41,7 +41,7 @@ await loadLegacyModules();
 
 const { useState, useEffect, useMemo, useReducer, useRef } = React;
 
-    // ── Reducer for app state ────────────────────────────────────────────
+    // Reducer for app state
     function appReducer(state, action) {
       switch (action.type) {
         case 'SET_STATE':
@@ -135,7 +135,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       }
     }
 
-    // ── Tweak defaults ───────────────────────────────────────────────────
+    // Tweak defaults
     const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
       "dark": false,
       "density": "compact",
@@ -155,8 +155,19 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       };
     }
 
+    function profileInitials(name, email) {
+      const source = String(name || email?.split('@')?.[0] || 'FinTrack User').trim();
+      return source
+        .split(/[\s._-]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0))
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || 'FT';
+    }
+
     function applySessionProfile(session) {
-      if (!session?.user?.email) return;
+      if (!session?.user?.email) return null;
       const email = session.user.email;
       const handle = email.split('@')[0] || 'user';
       const pretty = handle
@@ -169,16 +180,27 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
         name: pretty,
         handle,
         email,
-        avatar: pretty
-          .split(' ')
-          .map((part) => part.charAt(0))
-          .join('')
-          .slice(0, 2)
-          .toUpperCase(),
+        avatar: profileInitials(pretty, email),
       };
+      return window.FT_DATA.user;
     }
 
-    // ── App root ─────────────────────────────────────────────────────────
+    function readProfileSettings(settingsKey, fallbackProfile) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(settingsKey) || 'null');
+        if (stored) return stored;
+      } catch (_) {}
+
+      if (settingsKey !== 'ft_settings') {
+        try {
+          const legacy = JSON.parse(localStorage.getItem('ft_settings') || 'null');
+          if (legacy?.email && legacy.email === fallbackProfile?.email) return legacy;
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    // App root
     function App() {
       // tweaks
       const [tw, setTw] = useTweaks(TWEAK_DEFAULTS);
@@ -196,8 +218,19 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       const [recoveryMode, setRecoveryMode] = useState(false);
       const [vaultStatus, setVaultStatus] = useState(supabaseMode ? 'checking' : 'unlocked');
       const [vaultRecoveryCode, setVaultRecoveryCode] = useState('');
+      const [profile, setProfile] = useState(() => ({ ...(window.FT_DATA.user || {}) }));
+      const profileSettingsKey = supabaseMode && session?.user?.id ? `ft_settings_${session.user.id}` : 'ft_settings';
+      const syncProfile = (nextProfile = {}) => {
+        const merged = {
+          ...(window.FT_DATA.user || {}),
+          ...nextProfile,
+        };
+        merged.avatar = profileInitials(merged.name, merged.email);
+        window.FT_DATA.user = merged;
+        setProfile({ ...merged });
+      };
 
-      // auth — onboarding if not "logged in"
+      // Auth and onboarding
       const params = new URLSearchParams(location.search);
       const forceOnboard = params.get('onboard') === '1';
       // For demo purposes default to logged-in unless they explicitly land
@@ -217,7 +250,8 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
         window.FinTrackSupabase.getSession()
           .then((activeSession) => {
             if (!alive) return;
-            applySessionProfile(activeSession);
+            const nextProfile = applySessionProfile(activeSession);
+            if (nextProfile) setProfile({ ...nextProfile });
             setSession(activeSession);
             setAuthReady(true);
             setVaultStatus(activeSession ? 'checking' : 'signed-out');
@@ -227,7 +261,8 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
             if (alive) setAuthReady(true);
           });
         return window.FinTrackSupabase.onAuthStateChange((event, activeSession) => {
-          applySessionProfile(activeSession);
+          const nextProfile = applySessionProfile(activeSession);
+          if (nextProfile) setProfile({ ...nextProfile });
           setSession(activeSession);
           setAuthReady(true);
           if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true);
@@ -238,7 +273,12 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
         });
       }, [supabaseMode]);
 
-      // route — persisted
+      useEffect(() => {
+        const storedProfile = readProfileSettings(profileSettingsKey, window.FT_DATA.user || {});
+        syncProfile(storedProfile || {});
+      }, [profileSettingsKey]);
+
+      // route
       const [route, setRoute] = useState(() => localStorage.getItem('ft_route') || 'dashboard');
       useEffect(() => { localStorage.setItem('ft_route', route); }, [route]);
 
@@ -361,7 +401,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
         setAuthed(false);
       };
 
-      // ── apply theme + density + accent ─────────────────────────────────
+      // Apply theme, density, and accent
       useEffect(() => {
         document.documentElement.setAttribute('data-theme', tw.dark ? 'dark' : 'light');
         document.documentElement.setAttribute('data-density', tw.density);
@@ -439,7 +479,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
         );
       }
 
-      // route → page
+      // Route to page
       const titleMap = {
         dashboard: t('nav.dashboard'),
         transactions: t('nav.transactions'),
@@ -457,7 +497,8 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
                      lang={lang} t={t}
                      onQuickAdd={() => openAdd('expense')}
                      sbMode={tw.sidebar}
-                     setSbMode={(v) => setTw('sidebar', v)} />
+                     setSbMode={(v) => setTw('sidebar', v)}
+                     profile={profile} />
 
             <main className="ft-main">
               <Topbar title={titleMap[route] || 'FinTrack'}
@@ -497,6 +538,9 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
                   <Settings lang={lang} t={t}
                             state={state}
                             supabaseMode={supabaseMode}
+                            profile={profile}
+                            settingsKey={profileSettingsKey}
+                            onProfileChange={syncProfile}
                             setLang={setLang}
                             tw={tw} setTw={setTw}
                             onLogout={onLogout}
@@ -522,7 +566,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       );
     }
 
-    // ── ComingSoon placeholder for goals/reports/settings ────────────────
+    // ComingSoon placeholder for goals, reports, and settings
     function LoadingGate({ lang, label }) {
       return (
         <div className="ob-wrap">
@@ -894,7 +938,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
           padding: 60, textAlign: 'center', maxWidth: 520, margin: '60px auto',
           background: 'linear-gradient(135deg, #FEFCE8, #FEF3C7)', border: 0,
         }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🚧</div>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>Soon</div>
           <h2 style={{ fontFamily: 'var(--ft-font-display)', fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', margin: '0 0 8px', color: '#0F1419' }}>
             {name}
           </h2>
@@ -905,7 +949,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       );
     }
 
-    // ── Tweaks panel ─────────────────────────────────────────────────────
+    // Tweaks panel
     function FinTrackTweaks({ tw, setTw, lang }) {
       return (
         <TweaksPanel title="Tweaks">
