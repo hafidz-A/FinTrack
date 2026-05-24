@@ -50,7 +50,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
             ...action.state,
           };
         case 'RESET_STATE':
-          return window.FinTrackExcel.resetState();
+          return action.state || window.FinTrackExcel.resetState();
         case 'ADD_TX': {
           const txs = [action.tx, ...state.transactions];
           let accounts = state.accounts;
@@ -144,6 +144,40 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       "accent": "#EC4899"
     }/*EDITMODE-END*/;
 
+    function emptyPrivateState() {
+      return {
+        transactions: [],
+        accounts: [],
+        categories: JSON.parse(JSON.stringify(window.FT_DATA.categories || [])),
+        budgets: [],
+        upcoming: [],
+        goals: [],
+      };
+    }
+
+    function applySessionProfile(session) {
+      if (!session?.user?.email) return;
+      const email = session.user.email;
+      const handle = email.split('@')[0] || 'user';
+      const pretty = handle
+        .split(/[._-]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ') || 'FinTrack User';
+      window.FT_DATA.user = {
+        ...(window.FT_DATA.user || {}),
+        name: pretty,
+        handle,
+        email,
+        avatar: pretty
+          .split(' ')
+          .map((part) => part.charAt(0))
+          .join('')
+          .slice(0, 2)
+          .toUpperCase(),
+      };
+    }
+
     // ── App root ─────────────────────────────────────────────────────────
     function App() {
       // tweaks
@@ -183,6 +217,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
         window.FinTrackSupabase.getSession()
           .then((activeSession) => {
             if (!alive) return;
+            applySessionProfile(activeSession);
             setSession(activeSession);
             setAuthReady(true);
             setVaultStatus(activeSession ? 'checking' : 'signed-out');
@@ -192,6 +227,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
             if (alive) setAuthReady(true);
           });
         return window.FinTrackSupabase.onAuthStateChange((event, activeSession) => {
+          applySessionProfile(activeSession);
           setSession(activeSession);
           setAuthReady(true);
           if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true);
@@ -285,11 +321,11 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       };
 
       const onResetPrivateData = () => {
-        dispatch({ type: 'RESET_STATE' });
+        dispatch({ type: 'RESET_STATE', state: supabaseMode ? emptyPrivateState() : undefined });
       };
 
       const createVault = async (vaultPassword) => {
-        const seed = window.FinTrackExcel.resetState();
+        const seed = emptyPrivateState();
         const result = await window.FinTrackSupabase.createVault(vaultPassword, seed);
         dispatch({ type: 'SET_STATE', state: result.state });
         setVaultRecoveryCode(result.recoveryCode);
@@ -298,7 +334,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       };
 
       const unlockVault = async (vaultPassword) => {
-        const loaded = await window.FinTrackSupabase.unlockVault(vaultPassword, window.FinTrackExcel.resetState());
+        const loaded = await window.FinTrackSupabase.unlockVault(vaultPassword, emptyPrivateState());
         dispatch({ type: 'SET_STATE', state: loaded });
         setVaultRecoveryCode('');
         setVaultStatus('unlocked');
@@ -306,7 +342,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
       };
 
       const recoverVault = async (recoveryCode, newVaultPassword) => {
-        const loaded = await window.FinTrackSupabase.recoverVault(recoveryCode, newVaultPassword, window.FinTrackExcel.resetState());
+        const loaded = await window.FinTrackSupabase.recoverVault(recoveryCode, newVaultPassword, emptyPrivateState());
         dispatch({ type: 'SET_STATE', state: loaded });
         setVaultRecoveryCode('');
         setVaultStatus('unlocked');
