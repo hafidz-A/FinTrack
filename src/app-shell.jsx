@@ -42,9 +42,6 @@ function Sidebar({ route, setRoute, lang, t, onQuickAdd, sbMode, setSbMode, prof
           title={collapsed ? it.label : undefined}>
               <Icon name={it.icon} size={19} />
               <span className="ft-sb-item-label">{it.label}</span>
-              {it.id === 'transactions' &&
-            <span className="ft-sb-badge">3</span>
-            }
             </button>
           )}
         </nav>

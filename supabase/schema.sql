@@ -37,6 +37,12 @@ for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+drop policy if exists "moneyflow delete own vault" on public.moneyflow_vaults;
+create policy "moneyflow delete own vault"
+on public.moneyflow_vaults
+for delete
+using (auth.uid() = user_id);
+
 create or replace function public.set_moneyflow_updated_at()
 returns trigger
 language plpgsql
