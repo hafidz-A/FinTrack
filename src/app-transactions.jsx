@@ -85,8 +85,26 @@ function Transactions({ state, dispatch, lang, t, search, onOpenAdd }) {
           <div className="tx-summary-num">
             {formatIDR(monthStats.net, { compact: true, sign: true })}
           </div>
-          <div className="tx-summary-delta" style={{ color: '#DFFB6E' }}>
-            ▲ {monthStats.income > 0 ? Math.round((monthStats.net / monthStats.income) * 100) : 0}% {lang === 'id' ? 'savings rate' : 'savings rate'}
+          <div className="tx-summary-delta">
+            {(() => {
+              const hasIncome = monthStats.income > 0;
+              const isPositive = monthStats.net >= 0;
+              if (isPositive) {
+                const pct = hasIncome ? Math.round((monthStats.net / monthStats.income) * 100) : 0;
+                return (
+                  <span style={{ color: '#DFFB6E', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700 }}>
+                    ▲ {pct}% {lang === 'id' ? 'rasio tabungan' : 'savings rate'}
+                  </span>
+                );
+              } else {
+                const pct = hasIncome ? Math.round((monthStats.expense / monthStats.income) * 100) : 100;
+                return (
+                  <span style={{ color: '#F87171', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700 }}>
+                    ▼ {pct}% {lang === 'id' ? 'melebihi pemasukan' : 'overspent'}
+                  </span>
+                );
+              }
+            })()}
           </div>
           <div style={{
             position: 'absolute', top: -40, right: -40,
