@@ -30,6 +30,7 @@ function defaultSettings(profile = {}) {
     email,
     phone: cleanText(profile.phone),
     bio: cleanText(profile.bio),
+    avatar: profile.avatar || initialsFromProfile(profile.name, profile.email),
     notifBudget: true,
     notifUpcoming: true,
     notifDaily: false,
@@ -76,7 +77,8 @@ function Settings({ lang, t, state, supabaseMode = false, profile = {}, settings
       email: cleanText(s.email),
       phone: cleanText(s.phone),
       bio: cleanText(s.bio),
-      avatar: initialsFromProfile(s.name, s.email),
+      avatar: s.avatar || initialsFromProfile(s.name, s.email),
+      joined: profile.joined || s.joined,
     };
     onProfileChange && onProfileChange(nextProfile);
   }, [s, settingsKey]);
@@ -89,6 +91,96 @@ function Settings({ lang, t, state, supabaseMode = false, profile = {}, settings
   const [delDataOpen, setDelDataOpen] = useState(false);
   const [delAccOpen, setDelAccOpen] = useState(false);
   const [delConfirm, setDelConfirm] = useState('');
+
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [stream, setStream] = useState(null);
+  const videoRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const emojisList = ['🦊', '🦁', '🐯', '🐼', '🐨', '🐱', '🐶', '🐷', '🐸', '🚀', '💡', '💰', '🎨', '👔', '👩‍💻', '👨‍💻', '🍕', '🍔', '🍦', '🍩', '🚗', '🎮', '🏀', '🎸', '🌟', '🍀'];
+
+  const startCamera = async () => {
+    try {
+      setCameraActive(true);
+      const sStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 300, height: 300, facingMode: 'user' }
+      });
+      setStream(sStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = sStream;
+      }
+    } catch (err) {
+      console.error(err);
+      ToastBus.push(lang === 'id' ? 'Gagal mengakses kamera' : 'Failed to access camera');
+      setCameraActive(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      setStream(null);
+    }
+    setCameraActive(false);
+  };
+
+  const takePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 300;
+      canvas.height = 300;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoRef.current, 0, 0, 300, 300);
+      const dataUrl = canvas.toDataURL('image/jpeg');
+      setS((prev) => ({ ...prev, avatar: dataUrl }));
+      stopCamera();
+      setAvatarPickerOpen(false);
+      ToastBus.push(lang === 'id' ? 'Foto profil diperbarui' : 'Profile photo updated');
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setS((prev) => ({ ...prev, avatar: event.target.result }));
+        setAvatarPickerOpen(false);
+        ToastBus.push(lang === 'id' ? 'Foto profil diperbarui' : 'Profile photo updated');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const closeAvatarPicker = () => {
+    stopCamera();
+    setAvatarPickerOpen(false);
+  };
+
+  const selectEmoji = (emo) => {
+    setS((prev) => ({ ...prev, avatar: emo }));
+    setAvatarPickerOpen(false);
+    ToastBus.push(lang === 'id' ? 'Avatar diperbarui' : 'Avatar updated');
+  };
+
+  const removeAvatar = () => {
+    setS((prev) => ({ ...prev, avatar: '' }));
+    setAvatarPickerOpen(false);
+    ToastBus.push(lang === 'id' ? 'Avatar direset' : 'Avatar reset');
+  };
+
+  const getJoinedDateStr = () => {
+    const rawJoined = profile.joined || s.joined || '2026-03-15T00:00:00.000Z';
+    if (rawJoined.includes('T') || !isNaN(Date.parse(rawJoined))) {
+      const d = new Date(rawJoined);
+      const monthNamesInd = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      const monthNamesEng = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const mName = lang === 'id' ? monthNamesInd[d.getMonth()] : monthNamesEng[d.getMonth()];
+      return `${mName} ${d.getFullYear()}`;
+    }
+    return rawJoined;
+  };
 
   const sections = [
     { id: 'profile',  icon: 'user',     label: t('settings.sectionProfile') },
@@ -150,16 +242,22 @@ function Settings({ lang, t, state, supabaseMode = false, profile = {}, settings
               </div>
 
               <div className="set-profile-head">
-                <div className="set-avatar-big">{profileInitials}</div>
+                <div className="set-avatar-big">
+                  {s.avatar && (s.avatar.startsWith('http') || s.avatar.startsWith('data:image')) ? (
+                    <img src={s.avatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    s.avatar || profileInitials
+                  )}
+                </div>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <div style={{ fontFamily: 'var(--ft-font-display)', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>{s.name}</div>
                   <div style={{ fontSize: 13.5, color: 'var(--ft-text-2)', marginTop: 2 }}>{profileMeta}</div>
                   <div style={{ fontSize: 12, color: 'var(--ft-text-3)', marginTop: 6 }}>
-                    {t('settings.memberSince')} {lang === 'id' ? 'Maret 2026' : 'March 2026'}
+                    {t('settings.memberSince')} {getJoinedDateStr()}
                   </div>
                 </div>
                 <div className="set-avatar-actions">
-                  <button className="ft-btn" data-variant="ghost" data-size="sm">{t('settings.changeAvatar')}</button>
+                  <button className="ft-btn" data-variant="ghost" data-size="sm" onClick={() => setAvatarPickerOpen(true)}>{t('settings.changeAvatar')}</button>
                 </div>
               </div>
 
@@ -462,6 +560,69 @@ function Settings({ lang, t, state, supabaseMode = false, profile = {}, settings
             ? 'Kami akan menghapus akunmu dalam 30 hari. Selama periode tersebut kamu masih bisa membatalkan dengan login kembali.'
             : "We'll delete your account in 30 days. You can cancel during this window by logging back in."}
         </p>
+      </Modal>
+
+      {/* Avatar Picker Modal */}
+      <Modal open={avatarPickerOpen} onClose={closeAvatarPicker}
+             title={lang === 'id' ? 'Ubah Avatar / Foto Profil' : 'Change Avatar / Profile Photo'}
+             sub={lang === 'id' ? 'Pilih emoji default, upload foto Anda, atau ambil foto dengan kamera.' : 'Choose a default emoji, upload your photo, or capture from camera.'}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {cameraActive ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 220, height: 220, borderRadius: '50%', overflow: 'hidden', border: '4px solid var(--ft-action)', background: '#000', position: 'relative' }}>
+                <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="ft-btn" data-variant="primary" onClick={takePhoto}>
+                  📸 {lang === 'id' ? 'Ambil Foto' : 'Take Photo'}
+                </button>
+                <button className="ft-btn" data-variant="ghost" onClick={stopCamera}>
+                  {lang === 'id' ? 'Kembali' : 'Cancel'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Emojis selection grid */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--ft-text-2)' }}>
+                  {lang === 'id' ? 'Pilih dari Emoji' : 'Select an Emoji'}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, maxHeight: 180, overflowY: 'auto', padding: 4, background: 'var(--ft-bg)', borderRadius: 12 }}>
+                  {emojisList.map((emo) => (
+                    <button key={emo} type="button" className="ft-btn" data-variant="ghost"
+                            style={{ height: 44, padding: 0, fontSize: 22, border: 'none', background: 'transparent' }}
+                            onClick={() => selectEmoji(emo)}>
+                      {emo}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Upload and camera actions */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <input type="file" ref={fileInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleFileUpload} />
+                
+                <button className="ft-btn" data-variant="primary" style={{ width: '100%' }}
+                        onClick={() => fileInputRef.current && fileInputRef.current.click()}>
+                  📁 {lang === 'id' ? 'Pilih Foto dari File' : 'Upload Photo from File'}
+                </button>
+
+                <button className="ft-btn" data-variant="ghost" style={{ width: '100%', gap: 8 }}
+                        onClick={startCamera}>
+                  📷 {lang === 'id' ? 'Gunakan Kamera' : 'Use Camera'}
+                </button>
+
+                {s.avatar && (
+                  <button className="ft-btn" data-variant="ghost" style={{ width: '100%', color: 'var(--ft-danger)', borderColor: 'var(--ft-danger)' }}
+                          onClick={removeAvatar}>
+                    🗑️ {lang === 'id' ? 'Hapus Foto / Reset' : 'Remove Photo / Reset'}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </Modal>
     </div>
   );

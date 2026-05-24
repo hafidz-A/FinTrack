@@ -180,7 +180,8 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
         name: pretty,
         handle,
         email,
-        avatar: profileInitials(pretty, email),
+        avatar: window.FT_DATA.user?.avatar || profileInitials(pretty, email),
+        joined: session.user.created_at || window.FT_DATA.user?.joined || new Date().toISOString(),
       };
       return window.FT_DATA.user;
     }
@@ -225,7 +226,7 @@ const { useState, useEffect, useMemo, useReducer, useRef } = React;
           ...(window.FT_DATA.user || {}),
           ...nextProfile,
         };
-        merged.avatar = profileInitials(merged.name, merged.email);
+        merged.avatar = nextProfile.avatar || merged.avatar || profileInitials(merged.name, merged.email);
         window.FT_DATA.user = merged;
         setProfile({ ...merged });
       };

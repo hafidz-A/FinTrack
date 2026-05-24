@@ -56,7 +56,13 @@ function Sidebar({ route, setRoute, lang, t, onQuickAdd, sbMode, setSbMode, prof
       <div className="ft-sb-spacer" data-comment-anchor="57188f4f20-div-46-7" />
 
       <button className="ft-sb-profile" onClick={() => setRoute('settings')}>
-        <div className="ft-avatar">{activeProfile.avatar || 'FT'}</div>
+        <div className="ft-avatar">
+          {activeProfile.avatar && (activeProfile.avatar.startsWith('http') || activeProfile.avatar.startsWith('data:image')) ? (
+            <img src={activeProfile.avatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+          ) : (
+            activeProfile.avatar || 'FT'
+          )}
+        </div>
         <div className="ft-sb-profile-text">
           <div className="ft-sb-profile-name">{activeProfile.name || 'FinTrack User'}</div>
           <div className="ft-sb-profile-mail" data-comment-anchor="f697ac8b52-div-58-11">{activeProfile.email || ''}</div>
