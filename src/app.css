@@ -1396,6 +1396,7 @@
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   cursor: pointer;
   transition: all .15s;
+  color: var(--ft-text-2);
 }
 .qa-cat-emoji { font-size: 20px; }
 .qa-cat-label { font-size: 11.5px; font-weight: 600; text-align: center; line-height: 1.2; }
@@ -1404,6 +1405,7 @@
   border-color: var(--ft-action);
   background: var(--ft-action-soft);
   box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+  color: var(--ft-action) !important;
 }
 [data-theme="dark"] .qa-cat[data-active="true"] { background: rgba(37,99,235,.15); }
 
