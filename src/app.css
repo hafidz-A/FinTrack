@@ -1258,6 +1258,9 @@
   align-items: center; justify-content: center;
   padding: 48px;
   overflow-y: auto;
+  background: var(--ft-surface);
+  color: var(--ft-text);
+  border-left: 1px solid var(--ft-border);
 }
 @media (max-width: 900px) {
   .ob-left { display: none; }
@@ -2145,4 +2148,29 @@
   border: 0 !important;
   position: relative !important;
   overflow: hidden !important;
+}
+
+/* Accessibility & contrast overrides for elements on dark/shifting backgrounds */
+.ob-left {
+  --ft-logo-bg: var(--ft-action) !important;
+}
+
+[data-theme="dark"] .ft-sb-item[data-active="true"] {
+  color: #0B1220 !important;
+}
+
+[data-theme="dark"] .ft-sb-toggle:hover {
+  color: #0B1220 !important;
+}
+
+[data-theme="dark"] .tx-chip[data-active="true"] {
+  color: #0B1220 !important;
+}
+
+[data-theme="dark"] .qa-type-btn[data-active="true"][data-type="transfer"] {
+  color: #0B1220 !important;
+}
+
+[data-theme="dark"] .set-sidenav button[data-active="true"] {
+  color: #0B1220 !important;
 }

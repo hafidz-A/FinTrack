@@ -92,9 +92,9 @@
   --ft-info: #38BDF8;
   --ft-info-soft: #0C4A6E;
 
-  --ft-text: #F1F5F9;
-  --ft-text-2: #94A3B8;
-  --ft-text-3: #64748B;
+  --ft-text: #F8FAFC;
+  --ft-text-2: #E2E8F0;
+  --ft-text-3: #94A3B8;
   --ft-border: #1E293B;
   --ft-border-2: #334155;
   --ft-bg: #0B1220;
@@ -279,3 +279,17 @@ a { color: inherit; text-decoration: none; }
   animation: ft-fade-up 0.3s cubic-bezier(.2,.7,.3,1) both;
 }
 [data-theme="dark"] .ft-toast { background: var(--ft-surface); color: var(--ft-text); border: 1px solid var(--ft-border); }
+
+/* Dark theme button accessibility overrides */
+[data-theme="dark"] .ft-btn[data-variant="primary"] {
+  color: #0B1220;
+}
+[data-theme="dark"] .ft-btn[data-variant="primary"]:hover {
+  background: #3B7DF2;
+}
+[data-theme="dark"] .ft-btn[data-variant="action"] {
+  color: #0B1220;
+}
+[data-theme="dark"] .ft-btn[data-variant="action"]:hover {
+  background: #4B95F2;
+}

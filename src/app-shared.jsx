@@ -189,7 +189,7 @@ function Logo({ size = 32, collapsed = false }) {
     <div className="ft-logo-wrap" style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
       <span className="ft-logo-mark" style={{
         width: size, height: size,
-        background: 'var(--ft-primary)',
+        background: 'var(--ft-logo-bg, var(--ft-primary))',
         color: 'white',
         borderRadius: size * 0.32,
         display: 'grid', placeItems: 'center',
